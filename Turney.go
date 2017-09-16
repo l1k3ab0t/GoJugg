@@ -46,7 +46,7 @@ func loadCFG() (settings, []GameEngine.Team) {
 	teamList := ReadConfig.ReadFile(s.list)
 	for i := range teamList {
 		log.Println(strconv.Itoa(teamList[i].Linenumber) + " " + teamList[i].Content)
-		t = append(t, GameEngine.Team{teamList[i].Content, teamList[i].Linenumber, teamList[i].Linenumber, 1})
+		t = append(t, GameEngine.Team{teamList[i].Content, teamList[i].Linenumber, teamList[i].Linenumber, 1, nil, 0})
 	}
 
 	return s, t
@@ -55,10 +55,15 @@ func loadCFG() (settings, []GameEngine.Team) {
 func main() {
 	s, t := loadCFG()
 	if s.gameMode == 0 {
-		t = GameEngine.BuildGroups(s.groupCont, t)
+		tg := GameEngine.BuildGroups(s.groupCont, t)
+		log.Println(len(tg))
+		log.Println("_________________________")
+		log.Println(tg[3])
+		g := GameEngine.BuildGroupGames(tg[3])
+		log.Println(tg[3])
+		for _, v := range g {
+			log.Println(v.Opponent1, " vs ", v.Opponent2)
+		}
 	}
-	log.Println("_________________________")
-	for _, v := range t {
-		log.Println(v.Name + " " + strconv.Itoa(v.Group))
-	}
+
 }
