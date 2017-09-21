@@ -40,14 +40,15 @@ func BuildGroups(gCount int, teams []Team) [][]Team {
 	return tg
 }
 
-func BuildGroupGames(teams []Team) []Game {
+func BuildGroupGames(t []Team) []Game {
 	var games []Game
+	var teams []Team
+	teams = append(teams,t...)
 	teams = sortByLeastPlayed(teams)
 	//log.Println(teams)
 	for i := 0; i < len(teams); i++ {
 		for i2 := 0; i2 < len(teams); i2++ {
 			if len(teams) >= 1 {
-
 				if !playedAgainst(teams[i].ID, teams[i2]) && teams[i].ID != teams[i2].ID {
 					log.Println(i, " ", i2)
 					games = append(games, buildGame(teams[i], teams[i2]))
@@ -63,6 +64,7 @@ func BuildGroupGames(teams []Team) []Game {
 			}
 		}
 	}
+	log.Println("Teams ",teams)
 	return games
 }
 
@@ -105,4 +107,23 @@ func findAndRemove(t Team, teams []Team) []Team {
 	}
 	log.Println("Removed ", t.Name, " ", teams)
 	return teams
+}
+
+func GroupPlayed(teams []Team, games []Game) []Team {
+	for _,v:=range games{
+		for i:=range teams{
+			if v.Opponent1.ID==teams[i].ID {
+				teams[i]=played(teams[i],v.Opponent2)
+			}
+			if v.Opponent2.ID==teams[i].ID {
+				teams[i]=played(teams[i],v.Opponent1)
+			}
+		}
+	}
+	return teams
+}
+
+func played(t Team, opponent Team) Team {
+	t.PlayedVS =append(t.PlayedVS,opponent.ID)
+	return t
 }

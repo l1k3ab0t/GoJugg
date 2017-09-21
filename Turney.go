@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/l1k3ab0t/GoJugg/lib/GameEngine"
 	"github.com/l1k3ab0t/GoJugg/lib/ReadConfig"
 	"log"
@@ -56,13 +57,17 @@ func main() {
 	s, t := loadCFG()
 	if s.gameMode == 0 {
 		tg := GameEngine.BuildGroups(s.groupCont, t)
-		log.Println(len(tg))
-		log.Println("_________________________")
-		log.Println(tg[3])
 		g := GameEngine.BuildGroupGames(tg[3])
-		log.Println(tg[3])
+		log.Println("Test  ",tg[3])
 		for _, v := range g {
 			log.Println(v.Opponent1, " vs ", v.Opponent2)
+		}
+		tg[3] = GameEngine.GroupPlayed(tg[3], g)
+		g = GameEngine.BuildGroupGames(tg[3])
+
+		for _, v := range g {
+			log.Println(v.Opponent1, " vs ", v.Opponent2)
+
 		}
 	}
 
