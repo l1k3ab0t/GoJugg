@@ -1,23 +1,31 @@
 package main
 
 import (
-	"fmt"
 	"github.com/l1k3ab0t/GoJugg/lib/GameEngine"
 	"github.com/l1k3ab0t/GoJugg/lib/ReadConfig"
 	"log"
 	"strconv"
 	"net/http"
 	"html/template"
+	"github.com/l1k3ab0t/GoJugg/lib/FormatHTML"
+	"fmt"
 )
 
 type settings struct {
+	webcfg bool
 	name string
 	list      string
 	gameMode  int
 	groupCont int
 
 }
+type data struct {
+	Name string
+	Table template.HTML
 
+}
+
+var tdata data
 //var tName string
 var setupDone   bool
 var templates = template.Must(template.ParseFiles("resources/control.html","resources/tournament.html","resources/setup.html"))
@@ -27,6 +35,13 @@ func loadCFG() (settings, []GameEngine.Team) {
 	var t []GameEngine.Team
 	cfg := ReadConfig.ReadFile("config.cfg")
 	for _, v := range cfg {
+		if ReadConfig.SplitConfig(v.Content)[0] == "EnableWebConfig" {
+			if ReadConfig.SplitConfig(v.Content)[1]=="TRUE" {
+				s.webcfg = true
+			}else {
+				s.webcfg = false
+			}
+		}
 		if ReadConfig.SplitConfig(v.Content)[0] == "TournamentName" {
 			s.name=ReadConfig.SplitConfig(v.Content)[1]
 		}
@@ -82,13 +97,27 @@ func setupPage(w http.ResponseWriter, r *http.Request) {
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
+func addTeam(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("method:", r.Method) //get request method
+	if r.Method == "GET" {
+		r.ParseForm()
+		// logic part of log in
+		log.Println("Add Team: ", r.Form["Team"])
+	} else {
+		r.ParseForm()
+		// logic part of log in
+		log.Println("Add Team: ", r.Form["Team"])
+	}
+	http.Redirect(w, r, "/setup/", http.StatusFound)
+}
+
 func mainPage(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "tournament")
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string) {
-	err := templates.ExecuteTemplate(w, tmpl+".html", nil)
+	err := templates.ExecuteTemplate(w, tmpl+".html", tdata)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -97,6 +126,7 @@ func renderTemplate(w http.ResponseWriter, tmpl string) {
 func main() {
 	setupDone=false
 	s, t := loadCFG()
+	setupDone=!s.webcfg
 	if s.gameMode == 0 {
 		tg := GameEngine.BuildGroups(s.groupCont, t)
 		g := GameEngine.BuildGroupGames(tg[3])
@@ -113,12 +143,14 @@ func main() {
 		}
 	}
 
-	//tName=s.name
-
+	tdata.Name=s.name
+	tdata.Table=FormatHTML.FormatTeamLIst(t)
 	http.Handle("/resources/", http.StripPrefix("/resources/", http.FileServer(http.Dir("resources"))))
 	http.HandleFunc("/", defaultConnection)
 	http.HandleFunc("/control/", controlPage)
 	http.HandleFunc("/setup/", setupPage)
+	http.HandleFunc("/addTeam", addTeam)
 	http.HandleFunc("/tournament/", mainPage)
 	log.Fatal(http.ListenAndServe(":8080", nil))
+
 }

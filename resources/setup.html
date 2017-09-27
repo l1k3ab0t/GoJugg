@@ -2,9 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Setup Page</title>
+    <title>{{.Name}} Setup Page</title>
 </head>
 <body>
-    <h1>Setup Page</h1>
+    <h1>{{.Name}} Setup Page</h1>
+    <form action="/addTeam" method="post">
+        Team:<input type="text" name="Team"><br>
+        <input type="submit" value="Add Team">
+    </form>
 </body>
 </html>
