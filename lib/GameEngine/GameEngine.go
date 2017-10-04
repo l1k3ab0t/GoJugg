@@ -16,11 +16,12 @@ type Team struct {
 type Game struct {
 	Opponent1 Team
 	Opponent2 Team
-	//Result    GameResult
+	Result    GameResult
 }
 
 type GameResult struct {
-	winner Team
+	Team1Juggs int
+	Team2Juggs int
 }
 
 func BuildGroups(gCount int, teams []Team) [][]Team {
@@ -69,7 +70,7 @@ func BuildGroupGames(t []Team) []Game {
 }
 
 func buildGame(op1 Team, op2 Team) Game {
-	return Game{op1, op2}
+	return Game{op1, op2,GameResult{0,0}}
 }
 
 func playedAgainst(ID int, t Team) bool {

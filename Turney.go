@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"html/template"
 	"github.com/l1k3ab0t/GoJugg/lib/FormatHTML"
-	"fmt"
 )
 
 type settings struct {
@@ -22,13 +21,18 @@ type settings struct {
 type data struct {
 	Name string
 	Table template.HTML
+	Bracked template.HTML
+	I int
+	I2 int
 
 }
-
-var tdata data
+var s settings
+var tg [][][]GameEngine.Game
+var t []GameEngine.Team
+var defaultData data
 //var tName string
 var setupDone   bool
-var templates = template.Must(template.ParseFiles("resources/control.html","resources/tournament.html","resources/setup.html"))
+var templates = template.Must(template.ParseFiles("resources/control.html","resources/tournament.html","resources/games.html","resources/setup.html"))
 
 func loadCFG() (settings, []GameEngine.Team) {
 	var s settings
@@ -88,46 +92,118 @@ func defaultConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func controlPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "control")
+	renderTemplate(w, "control",defaultData)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
 func setupPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "setup")
+	renderTemplate(w, "setup",defaultData)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
 func addTeam(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("method:", r.Method) //get request method
-	if r.Method == "GET" {
-		r.ParseForm()
-		// logic part of log in
-		log.Println("Add Team: ", r.Form["Team"])
-	} else {
-		r.ParseForm()
-		// logic part of log in
-		log.Println("Add Team: ", r.Form["Team"])
-	}
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	log.Println("Add Team: ", r.Form["Team"])
 	http.Redirect(w, r, "/setup/", http.StatusFound)
 }
 
-func mainPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "tournament")
+func games(w http.ResponseWriter, r *http.Request) {
+	tdata:=defaultData
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	log.Println("Group: ", r.FormValue("Page"))
+	log.Println("Round: ", r.FormValue("Round"))
+
+	if r.Form["CGroup"]!=nil {
+
+		log.Println("Group Changed")
+		tdata.I2=0
+
+		iP,_:=strconv.Atoi(r.FormValue("Page"))
+		if iP<6 {
+			tdata.I = iP + 1
+		}else {
+			tdata.I=0
+		}
+		tdata.Bracked=FormatHTML.FormatBracket(tg[tdata.I][tdata.I2])
+	}
+
+	if r.Form["CRound"]!=nil {
+
+		log.Println("Round Changed")
+		iR,_:=strconv.Atoi(r.FormValue("Round"))
+		if iR<6 {
+			tdata.I2 = iR + 1
+		}else {
+			tdata.I2=0
+		}
+		iP,_:=strconv.Atoi(r.FormValue("Page"))
+		tdata.I = iP
+		tdata.Bracked=FormatHTML.FormatBracket(tg[tdata.I][tdata.I2])
+	}
+	if r.Form["Custom"]!=nil {
+
+		log.Println("Custom Destination")
+		iP,_:=strconv.Atoi(r.FormValue("Page"))
+		if iP<6 {
+			tdata.I = iP
+		}else {
+			tdata.I=0
+		}
+
+		iR,_:=strconv.Atoi(r.FormValue("Round"))
+		if iR<6 {
+			tdata.I2 = iR
+		}else {
+			tdata.I2=0
+		}
+		tdata.Bracked=FormatHTML.FormatBracket(tg[tdata.I][tdata.I2])
+	}
+
+	renderTemplate(w, "games",tdata)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
-func renderTemplate(w http.ResponseWriter, tmpl string) {
-	err := templates.ExecuteTemplate(w, tmpl+".html", tdata)
+func mainPage(w http.ResponseWriter, r *http.Request) {
+	renderTemplate(w, "tournament",defaultData)
+	log.Printf("IP: " + r.RemoteAddr + " connected")
+}
+
+
+func renderTemplate(w http.ResponseWriter, tmpl string,t data) {
+	err := templates.ExecuteTemplate(w, tmpl+".html", t)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+
 	}
 }
 
 func main() {
 	setupDone=false
-	s, t := loadCFG()
+	s, t = loadCFG()
 	setupDone=!s.webcfg
+	var gq [][]GameEngine.Game
 	if s.gameMode == 0 {
+		gpGroups := GameEngine.BuildGroups(s.groupCont, t)
+		for i:=0;i<=s.groupCont;i++{
+			for u:=0;u<=6;u++{
+				gq=append(gq,GameEngine.BuildGroupGames(gpGroups[i]))
+				//tg[i][u]=append(tg[i][u],GameEngine.BuildGroupGames(gpGroups[i]))
+				gpGroups[i]=GameEngine.GroupPlayed(gpGroups[i],gq[u])
+			}
+			tg=append(tg,gq)
+			gq=nil
+		}
+		for i,v:=range tg {
+			for i2, v2 := range v {
+				log.Println("Group:", i, " Round ",i2," ", v2)
+			}
+		}
+	}
+
+
+		/*
 		tg := GameEngine.BuildGroups(s.groupCont, t)
 		g := GameEngine.BuildGroupGames(tg[3])
 		log.Println("Test  ",tg[3])
@@ -141,14 +217,17 @@ func main() {
 			log.Println(v.Opponent1, " vs ", v.Opponent2)
 
 		}
+		defaultData.Bracked=FormatHTML.FormatBracket(g)
 	}
-
-	tdata.Name=s.name
-	tdata.Table=FormatHTML.FormatTeamLIst(t)
+	*/
+	defaultData.Name=s.name
+	defaultData.Table=FormatHTML.FormatTeamLIst(t)
+	defaultData.Bracked=FormatHTML.FormatBracket(tg[0][0])
 	http.Handle("/resources/", http.StripPrefix("/resources/", http.FileServer(http.Dir("resources"))))
 	http.HandleFunc("/", defaultConnection)
 	http.HandleFunc("/control/", controlPage)
 	http.HandleFunc("/setup/", setupPage)
+	http.HandleFunc("/games", games)
 	http.HandleFunc("/addTeam", addTeam)
 	http.HandleFunc("/tournament/", mainPage)
 	log.Fatal(http.ListenAndServe(":8080", nil))
