@@ -128,3 +128,99 @@ func played(t Team, opponent Team) Team {
 	t.PlayedVS =append(t.PlayedVS,opponent.ID)
 	return t
 }
+
+func SortByRankInTourney(games [][][]Game, teams []Team ) map[int]GameResult{
+	m := make(map[int]GameResult)
+	log.Println(len(games))
+	for i,v:=range games {
+		for i2, v2 := range v {
+			log.Println("Group:", i, " Round ",i2," ", v2)
+		}
+	}
+
+	for _,v:=range teams {
+		log.Println("Team:", v.Name, " Stats ",m[v.ID])
+	}
+
+	return nil
+}
+
+func SortByRankInGroup (games [][]Game, teams []Team ) map[int]GameResult{
+	m := make(map[int]GameResult)
+	log.Println(len(games))
+	for i,v:=range games {
+		for i2, v2 := range v {
+			log.Println("Group:", i, " Round ",i2," ", v2)
+		}
+	}
+	for _,v:=range teams {
+		m[v.ID]=getResults(v,games)
+	}
+	u:=-100
+	for k,v:=range m{
+		//log.Println("TeamID:", k, " Result ",v)
+		i:=v.Team1Juggs-v.Team2Juggs
+		if  i>u{
+			u=i
+
+		}
+	}
+
+
+	for _,v:=range teams {
+		log.Println("Team:", v.Name, " Stats ",m[v.ID])
+	}
+
+	return nil
+}
+
+func sortByPoints(m map[int]GameResult) map[int]GameResult{
+	mSorted := make(map[int]GameResult)
+	var highesKey []int
+	u:=-100
+	m2:=m
+	for k,v:=range m{
+		//log.Println("TeamID:", k, " Result ",v)
+		{
+			highesKey=hightesByPoints(m)
+			if len(highesKey)>1 {
+				mSorted[]
+			}
+		}
+	}
+}
+
+func hightesByPoints(m map[int]GameResult) []int{
+	var kSave []int
+	u:=-100
+	for k,v:=range m{
+		//log.Println("TeamID:", k, " Result ",v)
+		i:=v.Team1Juggs-v.Team2Juggs
+		if  i>u{
+			u=i
+			kSave=nil
+			kSave=append(kSave,k)
+
+		}else if  i==u{
+			kSave=append(kSave,k)
+		}
+	}
+	return kSave
+}
+
+func getResults (t Team, games [][]Game ) GameResult{
+	var result GameResult
+	for _,v:=range games {
+		for _,v2:=range v {
+			if t.ID==v2.Opponent1.ID {
+				result.Team1Juggs=result.Team1Juggs+v2.Result.Team1Juggs
+				result.Team2Juggs=result.Team1Juggs+v2.Result.Team2Juggs
+
+			}else if t.ID==v2.Opponent2.ID {
+				result.Team1Juggs=result.Team1Juggs+v2.Result.Team2Juggs
+				result.Team2Juggs=result.Team1Juggs+v2.Result.Team1Juggs
+			}
+		}
+	}
+	return result
+	}

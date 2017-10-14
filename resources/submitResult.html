@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.Name}} Submit Game Result</title>
+</head>
+<body>
+<table>
+    <tr><th>{{.TextPharase1}}</th> <th>vs </th><th>{{.TextPharase2}}</th></tr>
+    <form action="/reciveResult" method="post">
+    <tr>
+        <td>
+            <input type="text" value=0 name="T1Juggs">
+        </td>
+        <td></td>
+        <td>
+            <input type="text" value=0 name="T2Juggs">
+        </td>
+        <td>
+            <input hidden="hidden" type="text" value="{{.TextPharase1}}" name="Team1">
+            <input hidden="hidden" type="text" value="{{.TextPharase2}}" name="Team2">
+            <input type="submit"  name="Result" value="Submit Result">
+        </td>
+    </tr>
+</table>
+</body>
+</html>
