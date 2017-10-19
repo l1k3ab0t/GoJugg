@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.Name}} Ranking</title>
+</head>
+    <body>
+    <h1>{{.Name}} Live Ranking {{.TextPhrase1}}</h1>
+    {{.Table}}
+    <form action="/rank" method="post">
+        <input hidden="hidden" type="text" value="{{.I}}" name="Group">
+        <input type="submit"  name="CGroup" value="Next Group">
+    </form>
+    <form action="/rank" method="post">
+        Group: <input type="text" value="{{.I}}" name="Group">
+        <input type="submit"  name="Custom" value="Go to">
+    </form>
+    <form action="/rank" method="post">
+        <input type="submit" value="All Groups">
+    </form>
+    </body>
+</html>

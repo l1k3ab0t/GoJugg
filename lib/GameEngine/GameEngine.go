@@ -24,6 +24,12 @@ type GameResult struct {
 	Team2Juggs int
 }
 
+type Rank struct {
+	Rank   int
+	TName  string
+	Result GameResult
+}
+
 func BuildGroups(gCount int, teams []Team) [][]Team {
 	x := 0
 	tg := make([][]Team, gCount+1)
@@ -44,7 +50,7 @@ func BuildGroups(gCount int, teams []Team) [][]Team {
 func BuildGroupGames(t []Team) []Game {
 	var games []Game
 	var teams []Team
-	teams = append(teams,t...)
+	teams = append(teams, t...)
 	teams = sortByLeastPlayed(teams)
 	//log.Println(teams)
 	for i := 0; i < len(teams); i++ {
@@ -65,12 +71,12 @@ func BuildGroupGames(t []Team) []Game {
 			}
 		}
 	}
-	log.Println("Teams ",teams)
+	log.Println("Teams ", teams)
 	return games
 }
 
 func buildGame(op1 Team, op2 Team) Game {
-	return Game{op1, op2,GameResult{0,0}}
+	return Game{op1, op2, GameResult{0, 0}}
 }
 
 func playedAgainst(ID int, t Team) bool {
@@ -111,13 +117,13 @@ func findAndRemove(t Team, teams []Team) []Team {
 }
 
 func GroupPlayed(teams []Team, games []Game) []Team {
-	for _,v:=range games{
-		for i:=range teams{
-			if v.Opponent1.ID==teams[i].ID {
-				teams[i]=played(teams[i],v.Opponent2)
+	for _, v := range games {
+		for i := range teams {
+			if v.Opponent1.ID == teams[i].ID {
+				teams[i] = played(teams[i], v.Opponent2)
 			}
-			if v.Opponent2.ID==teams[i].ID {
-				teams[i]=played(teams[i],v.Opponent1)
+			if v.Opponent2.ID == teams[i].ID {
+				teams[i] = played(teams[i], v.Opponent1)
 			}
 		}
 	}
@@ -125,102 +131,119 @@ func GroupPlayed(teams []Team, games []Game) []Team {
 }
 
 func played(t Team, opponent Team) Team {
-	t.PlayedVS =append(t.PlayedVS,opponent.ID)
+	t.PlayedVS = append(t.PlayedVS, opponent.ID)
 	return t
 }
 
-func SortByRankInTourney(games [][][]Game, teams []Team ) map[int]GameResult{
-	m := make(map[int]GameResult)
+// Ranking ------------------------------------------------------------------------------------------------------
+
+func SortByRankInTourney(games [][][]Game, teams [][]Team) []Rank {
+	var r []Rank
 	log.Println(len(games))
-	for i,v:=range games {
+	for i, v := range games {
 		for i2, v2 := range v {
-			log.Println("Group:", i, " Round ",i2," ", v2)
+			log.Println("Group:", i, " Round ", i2, " ", v2)
 		}
 	}
-
-	for _,v:=range teams {
-		log.Println("Team:", v.Name, " Stats ",m[v.ID])
+	log.Println(len(teams))
+	for _, v := range teams {
+		for _,v2:=range v {
+			r = append(r, Rank{1, v2.Name, getResults(v2, games[v2.Group])})
+		}
 	}
-
-	return nil
+	rs := sortByPoints(r)
+	log.Println(len(rs))
+	for i, v := range rs {
+		log.Println("Team:", i, " Stats ", v)
+	}
+	return rs
 }
 
-func SortByRankInGroup (games [][]Game, teams []Team ) map[int]GameResult{
-	m := make(map[int]GameResult)
+func SortByRank(games [][]Game, teams []Team) []Rank {
+	var r []Rank
 	log.Println(len(games))
-	for i,v:=range games {
+	for i, v := range games {
 		for i2, v2 := range v {
-			log.Println("Group:", i, " Round ",i2," ", v2)
+			log.Println("Group:", i, " Round ", i2, " ", v2)
 		}
 	}
-	for _,v:=range teams {
-		m[v.ID]=getResults(v,games)
+	log.Println(len(teams))
+	for _, v := range teams {
+		r = append(r, Rank{1, v.Name, getResults(v, games)})
 	}
-	u:=-100
-	for k,v:=range m{
-		//log.Println("TeamID:", k, " Result ",v)
-		i:=v.Team1Juggs-v.Team2Juggs
-		if  i>u{
-			u=i
-
-		}
+	rs := sortByPoints(r)
+	log.Println(len(rs))
+	for i, v := range rs {
+		log.Println("Team:", i, " Stats ", v)
 	}
-
-
-	for _,v:=range teams {
-		log.Println("Team:", v.Name, " Stats ",m[v.ID])
-	}
-
-	return nil
+	return rs
 }
 
-func sortByPoints(m map[int]GameResult) map[int]GameResult{
-	mSorted := make(map[int]GameResult)
-	var highesKey []int
-	u:=-100
-	m2:=m
-	for k,v:=range m{
-		//log.Println("TeamID:", k, " Result ",v)
-		{
-			highesKey=hightesByPoints(m)
-			if len(highesKey)>1 {
-				mSorted[]
+func sortByPoints(list []Rank) []Rank {
+	var r []Rank
+	saveu := 0
+	i := 0
+	var hRank []Rank
+	for range list {
+		if len(list) != 0 {
+			hRank = highestByPoints(list)
+			log.Println("highestRank: ", hRank)
+			multiR := i + 1 + saveu
+			for u, v := range hRank {
+				saveu = u
+				v.Rank = multiR
+				i = multiR
+				r = append(r, v)
+				log.Println("TeamID:", v, " Result ", v.Result)
+				list = findAndRemoveRanking(v.TName, list)
 			}
 		}
 	}
+	return r
 }
 
-func hightesByPoints(m map[int]GameResult) []int{
-	var kSave []int
-	u:=-100
-	for k,v:=range m{
+func highestByPoints(list []Rank) []Rank {
+	var hRank []Rank
+	u := -100
+	for _, v := range list {
 		//log.Println("TeamID:", k, " Result ",v)
-		i:=v.Team1Juggs-v.Team2Juggs
-		if  i>u{
-			u=i
-			kSave=nil
-			kSave=append(kSave,k)
+		i := v.Result.Team1Juggs - v.Result.Team2Juggs
+		if i > u {
+			u = i
+			hRank = nil
+			hRank = append(hRank, v)
 
-		}else if  i==u{
-			kSave=append(kSave,k)
+		} else if i == u {
+			hRank = append(hRank, v)
 		}
 	}
-	return kSave
+	log.Println(hRank)
+	return hRank
 }
 
-func getResults (t Team, games [][]Game ) GameResult{
+func getResults(t Team, games [][]Game) GameResult {
 	var result GameResult
-	for _,v:=range games {
-		for _,v2:=range v {
-			if t.ID==v2.Opponent1.ID {
-				result.Team1Juggs=result.Team1Juggs+v2.Result.Team1Juggs
-				result.Team2Juggs=result.Team1Juggs+v2.Result.Team2Juggs
+	for _, v := range games {
+		for _, v2 := range v {
+			if t.ID == v2.Opponent1.ID {
+				result.Team1Juggs = result.Team1Juggs + v2.Result.Team1Juggs
+				result.Team2Juggs = result.Team2Juggs + v2.Result.Team2Juggs
 
-			}else if t.ID==v2.Opponent2.ID {
-				result.Team1Juggs=result.Team1Juggs+v2.Result.Team2Juggs
-				result.Team2Juggs=result.Team1Juggs+v2.Result.Team1Juggs
+			} else if t.ID == v2.Opponent2.ID {
+				result.Team1Juggs = result.Team1Juggs + v2.Result.Team2Juggs
+				result.Team2Juggs = result.Team2Juggs + v2.Result.Team1Juggs
 			}
 		}
 	}
 	return result
+}
+
+func findAndRemoveRanking(teamName string, ranking []Rank) []Rank {
+	for i, v := range ranking {
+		if v.TName == teamName {
+			ranking = append(ranking[:i], ranking[i+1:]...)
+		}
 	}
+	log.Println("Removed ", teamName, " ", ranking)
+	return ranking
+}

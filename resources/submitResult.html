@@ -6,22 +6,23 @@
 </head>
 <body>
 <table>
-    <tr><th>{{.TextPharase1}}</th> <th>vs </th><th>{{.TextPharase2}}</th></tr>
-    <form action="/reciveResult" method="post">
+    <tr><th>{{.TextPhrase1}}</th> <th>vs </th><th>{{.TextPhrase2}}</th></tr>
+    <form action="/receiveResult" method="post">
     <tr>
         <td>
-            <input type="text" value=0 name="T1Juggs">
+            <input type="number" min="0" max="100" value=0 name="T1Juggs">
         </td>
         <td></td>
         <td>
-            <input type="text" value=0 name="T2Juggs">
+            <input type="number" min="0" max="100" value=0 name="T2Juggs">
         </td>
         <td>
-            <input hidden="hidden" type="text" value="{{.TextPharase1}}" name="Team1">
-            <input hidden="hidden" type="text" value="{{.TextPharase2}}" name="Team2">
+            <input hidden="hidden" type="text" value="{{.TextPhrase1}}" name="Team1">
+            <input hidden="hidden" type="text" value="{{.TextPhrase2}}" name="Team2">
             <input type="submit"  name="Result" value="Submit Result">
         </td>
     </tr>
+    </form>
 </table>
 </body>
 </html>
