@@ -247,3 +247,12 @@ func findAndRemoveRanking(teamName string, ranking []Rank) []Rank {
 	log.Println("Removed ", teamName, " ", ranking)
 	return ranking
 }
+
+func TeamRank(team Team, rank []Rank)  Rank{
+	for _,v:=range rank{
+		if v.TName==team.Name{
+			return v
+		}
+	}
+	return Rank{nil,nil,nil}
+}
