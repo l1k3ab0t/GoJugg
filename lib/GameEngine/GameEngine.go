@@ -147,7 +147,7 @@ func SortByRankInTourney(games [][][]Game, teams [][]Team) []Rank {
 	}
 	log.Println(len(teams))
 	for _, v := range teams {
-		for _,v2:=range v {
+		for _, v2 := range v {
 			r = append(r, Rank{1, v2.Name, getResults(v2, games[v2.Group])})
 		}
 	}

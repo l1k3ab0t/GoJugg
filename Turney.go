@@ -5,24 +5,29 @@ import (
 	"github.com/l1k3ab0t/GoJugg/lib/GameEngine"
 	"github.com/l1k3ab0t/GoJugg/lib/ReadConfig"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 )
 
 type settings struct {
-	webcfg    bool
-	name      string
-	list      string
-	gameMode  int
-	groupCont int
+	webcfg     bool
+	name       string
+	list       string
+	gameMode   int
+	groupCont  int
+	consoleLog bool
+	port       int
 }
 type data struct {
-	Name        string
+	Name        template.HTML
 	Table       template.HTML
 	Bracket     template.HTML
-	TextPhrase1 string
-	TextPhrase2 string
+	TextPhrase1 template.HTML
+	TextPhrase2 template.HTML
 	I           int
 	I2          int
 }
@@ -32,7 +37,7 @@ var gg [][][]GameEngine.Game
 var t []GameEngine.Team
 var defaultData data
 var setupDone bool
-var templates = template.Must(template.ParseFiles("resources/control.html", "resources/tournament.html", "resources/games.html", "resources/setup.html", "resources/submitResult.html", "resources/rank.html"))
+var templates = template.Must(template.ParseFiles("resources/control.html", "resources/tournament.html", "resources/games.html", "resources/setup.html", "resources/submitResult.html", "resources/rank.html", "resources/team.html"))
 
 func loadCFG() (settings, []GameEngine.Team) {
 	var s settings
@@ -70,6 +75,22 @@ func loadCFG() (settings, []GameEngine.Team) {
 				log.Println("Wrong Value set in GroupCount")
 			}
 		}
+		if ReadConfig.SplitConfig(v.Content)[0] == "ConsoleLog" {
+			if ReadConfig.SplitConfig(v.Content)[1] == "TRUE" {
+				s.consoleLog = true
+			} else {
+				s.consoleLog = false
+			}
+		}
+		if ReadConfig.SplitConfig(v.Content)[0] == "Port" {
+			i, err := strconv.Atoi(ReadConfig.SplitConfig(v.Content)[1])
+			if err != nil {
+				log.Fatalf("error setting Port: %v", err)
+			} else {
+				s.port = i
+			}
+
+		}
 
 	}
 
@@ -77,7 +98,7 @@ func loadCFG() (settings, []GameEngine.Team) {
 	teamList := ReadConfig.ReadFile(s.list)
 	for i := range teamList {
 		log.Println(strconv.Itoa(teamList[i].Linenumber) + " " + teamList[i].Content)
-		t = append(t, GameEngine.Team{teamList[i].Content, teamList[i].Linenumber, teamList[i].Linenumber, 1, nil, 0})
+		t = append(t, GameEngine.Team{FormatHTML.FormatTeamName(teamList[i].Content), teamList[i].Linenumber, teamList[i].Linenumber, 1, nil, 0})
 	}
 
 	return s, t
@@ -124,7 +145,7 @@ func rank(w http.ResponseWriter, r *http.Request) {
 		} else {
 			tdata.I = 0
 		}
-		tdata.TextPhrase1 = "from Group " + strconv.Itoa(tdata.I)
+		tdata.TextPhrase1 = template.HTML("from Group " + strconv.Itoa(tdata.I))
 		tdata.Table = FormatHTML.FormatRanking(GameEngine.SortByRank(gg[tdata.I], GameEngine.BuildGroups(s.groupCont, t)[tdata.I]))
 	} else if r.Form["Custom"] != nil {
 
@@ -135,7 +156,7 @@ func rank(w http.ResponseWriter, r *http.Request) {
 		} else {
 			tdata.I = 0
 		}
-		tdata.TextPhrase1 = "from Group " + strconv.Itoa(tdata.I)
+		tdata.TextPhrase1 = template.HTML("from Group " + strconv.Itoa(tdata.I))
 		tdata.Table = FormatHTML.FormatRanking(GameEngine.SortByRank(gg[tdata.I], GameEngine.BuildGroups(s.groupCont, t)[tdata.I]))
 
 	} else {
@@ -220,12 +241,12 @@ func submitResult(w http.ResponseWriter, r *http.Request) {
 			for _, v2 := range v {
 				for _, v3 := range v2 {
 					if v3.Opponent1.ID == iD1 && v3.Opponent2.ID == iD2 {
-						tdata.TextPhrase1 = v3.Opponent1.Name
-						tdata.TextPhrase2 = v3.Opponent2.Name
+						tdata.TextPhrase1 = template.HTML(v3.Opponent1.Name)
+						tdata.TextPhrase2 = template.HTML(v3.Opponent2.Name)
 						break
 					} else if v3.Opponent2.ID == iD1 && v3.Opponent1.ID == iD2 {
-						tdata.TextPhrase1 = v3.Opponent2.Name
-						tdata.TextPhrase2 = v3.Opponent1.Name
+						tdata.TextPhrase1 = template.HTML(v3.Opponent2.Name)
+						tdata.TextPhrase2 = template.HTML(v3.Opponent1.Name)
 						break
 					}
 				}
@@ -280,6 +301,13 @@ func mainPage(w http.ResponseWriter, r *http.Request) {
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
+func teamPage(w http.ResponseWriter, r *http.Request) {
+	d := defaultData
+	d.TextPhrase1 = FormatHTML.FormatURI(r.RequestURI)
+	renderTemplate(w, "team", d)
+	log.Printf("IP: " + r.RemoteAddr + " connected")
+}
+
 func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 	err := templates.ExecuteTemplate(w, tmpl+".html", t)
 	if err != nil {
@@ -291,6 +319,21 @@ func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 func main() {
 	setupDone = false
 	s, t = loadCFG()
+
+	lfName := time.Now().Format(time.RFC3339) + ".log"
+	f, err := os.OpenFile(lfName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	if s.consoleLog {
+		mw := io.MultiWriter(os.Stdout, f)
+		log.SetOutput(mw)
+	} else {
+		log.SetOutput(f)
+	}
+	log.Println("This is a test log entry")
+
 	setupDone = !s.webcfg
 	var gq [][]GameEngine.Game
 	if s.gameMode == 0 {
@@ -330,7 +373,8 @@ func main() {
 			defaultData.Bracked=FormatHTML.FormatBracket(g)
 		}
 	*/
-	defaultData.Name = s.name
+	log.Println(time.Now().Format(time.RFC3339))
+	defaultData.Name = template.HTML(s.name)
 	defaultData.Table = FormatHTML.FormatTeamLIst(t)
 	defaultData.Bracket = FormatHTML.FormatBracket(gg[0][0])
 	http.Handle("/resources/", http.StripPrefix("/resources/", http.FileServer(http.Dir("resources"))))
@@ -343,6 +387,8 @@ func main() {
 	http.HandleFunc("/submitResult", submitResult)
 	http.HandleFunc("/receiveResult", receiveResult)
 	http.HandleFunc("/tournament/", mainPage)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-
+	for _, v := range t {
+		http.HandleFunc("/"+v.Name, teamPage)
+	}
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(s.port), nil))
 }
