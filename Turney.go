@@ -304,6 +304,7 @@ func teamPage(w http.ResponseWriter, r *http.Request) {
 	team:=GameEngine.TeamByName(string(FormatHTML.FormatURI(r.RequestURI)),t)
 	d.Name = FormatHTML.FormatURI(r.RequestURI)
 	d.I=GameEngine.TeamRank(team.Name,GameEngine.SortByRankInTourney(gg, GameEngine.BuildGroups(s.groupCont, t))).Rank
+	d.I2=GameEngine.TeamRank(team.Name,GameEngine.SortByRank(gg[team.Group],GameEngine.BuildGroups(s.groupCont,t)[team.Group])).Rank
 	d.TextPhrase1=FormatHTML.FormatBracket(GameEngine.TeamGames(team.Name,gg[team.Group]))
 	renderTemplate(w, "team", d)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
