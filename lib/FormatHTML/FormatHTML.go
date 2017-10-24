@@ -52,6 +52,18 @@ func FormatTeamName(name string) string {
 	for _, char := range name {
 		if char == 32 { //32 == " "
 			rname = rname + "-"
+		}else if char == 228{
+			rname = rname + "ae"
+		}else if char == 196{
+			rname = rname + "Ae"
+		}else if char == 246{
+			rname = rname + "oe"
+		}else if char == 214{
+			rname = rname + "Oe"
+		}else if char == 252{
+			rname = rname + "ue"
+		}else if char == 220{
+			rname = rname + "Ue"
 		} else {
 			rname = rname + string(char)
 		}
@@ -72,3 +84,4 @@ func FormatURI(uri string) template.HTML {
 func FormatTeamLink(uri string) template.HTML {
 	return template.HTML("<a href=\"/" + uri + "\">" + uri + "</a>")
 }
+

@@ -5,10 +5,8 @@ import (
 	"github.com/l1k3ab0t/GoJugg/lib/GameEngine"
 	"github.com/l1k3ab0t/GoJugg/lib/ReadConfig"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 )
@@ -303,7 +301,10 @@ func mainPage(w http.ResponseWriter, r *http.Request) {
 
 func teamPage(w http.ResponseWriter, r *http.Request) {
 	d := defaultData
-	d.TextPhrase1 = FormatHTML.FormatURI(r.RequestURI)
+	team:=GameEngine.TeamByName(string(FormatHTML.FormatURI(r.RequestURI)),t)
+	d.Name = FormatHTML.FormatURI(r.RequestURI)
+	d.I=GameEngine.TeamRank(team.Name,GameEngine.SortByRankInTourney(gg, GameEngine.BuildGroups(s.groupCont, t))).Rank
+	d.TextPhrase1=FormatHTML.FormatBracket(GameEngine.TeamGames(team.Name,gg[team.Group]))
 	renderTemplate(w, "team", d)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
@@ -319,7 +320,7 @@ func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 func main() {
 	setupDone = false
 	s, t = loadCFG()
-
+	/*
 	lfName := time.Now().Format(time.RFC3339) + ".log"
 	f, err := os.OpenFile(lfName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -333,10 +334,12 @@ func main() {
 		log.SetOutput(f)
 	}
 	log.Println("This is a test log entry")
+	*/
 
 	setupDone = !s.webcfg
 	var gq [][]GameEngine.Game
 	if s.gameMode == 0 {
+		t=GameEngine.ChangeTGroup(s.groupCont,t)
 		gpGroups := GameEngine.BuildGroups(s.groupCont, t)
 		for i := 0; i <= s.groupCont; i++ {
 			for u := 0; u <= 6; u++ {

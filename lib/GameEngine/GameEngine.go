@@ -30,6 +30,21 @@ type Rank struct {
 	Result GameResult
 }
 
+func ChangeTGroup(gCount int, teams []Team) []Team {
+	x := 0
+	for i := range teams {
+
+		if x <= gCount {
+			teams[i].Group=x
+			x++
+		}
+		if x > gCount {
+			x = 0
+		}
+	}
+	return teams
+}
+
 func BuildGroups(gCount int, teams []Team) [][]Team {
 	x := 0
 	tg := make([][]Team, gCount+1)
@@ -248,11 +263,34 @@ func findAndRemoveRanking(teamName string, ranking []Rank) []Rank {
 	return ranking
 }
 
-func TeamRank(team Team, rank []Rank)  Rank{
+func TeamRank(team string, rank []Rank)  Rank{
+	var r Rank
 	for _,v:=range rank{
-		if v.TName==team.Name{
+		if v.TName==team{
 			return v
 		}
 	}
-	return Rank{nil,nil,nil}
+	return  r
+}
+
+func TeamGames(team string, games [][]Game) []Game {
+	var g []Game
+	for _,v:=range games{
+		for _,v2:=range v{
+			if v2.Opponent1.Name==team || v2.Opponent2.Name==team{
+				g=append(g,v2)
+			}
+		}
+	}
+	return g
+}
+
+func TeamByName (name string,t []Team) Team{
+	var team Team
+	for _,v:=range t{
+		if v.Name==name {
+			return v
+		}
+	}
+	return team
 }
