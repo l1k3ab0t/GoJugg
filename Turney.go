@@ -9,16 +9,20 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"os"
+	"io"
 )
 
 type settings struct {
 	webcfg     bool
 	name       string
 	list       string
+	fields	int
 	gameMode   int
 	groupCont  int
 	consoleLog bool
 	port       int
+	aTCount		int
 }
 type data struct {
 	Name        template.HTML
@@ -39,7 +43,6 @@ var templates = template.Must(template.ParseFiles("resources/control.html", "res
 
 func loadCFG() (settings, []GameEngine.Team) {
 	var s settings
-	var t []GameEngine.Team
 	cfg := ReadConfig.ReadFile("config.cfg")
 	for _, v := range cfg {
 		if ReadConfig.SplitConfig(v.Content)[0] == "EnableWebConfig" {
@@ -73,6 +76,14 @@ func loadCFG() (settings, []GameEngine.Team) {
 				log.Println("Wrong Value set in GroupCount")
 			}
 		}
+		if ReadConfig.SplitConfig(v.Content)[0] == "AdvancingfromGroups" {
+			i, err := strconv.Atoi(ReadConfig.SplitConfig(v.Content)[1])
+			if err != nil {
+				log.Fatalf("error setting Advancing Teams Count: %v", err)
+			} else {
+				s.aTCount = i
+			}
+		}
 		if ReadConfig.SplitConfig(v.Content)[0] == "ConsoleLog" {
 			if ReadConfig.SplitConfig(v.Content)[1] == "TRUE" {
 				s.consoleLog = true
@@ -93,13 +104,7 @@ func loadCFG() (settings, []GameEngine.Team) {
 	}
 
 	log.Println(s)
-	teamList := ReadConfig.ReadFile(s.list)
-	for i := range teamList {
-		log.Println(strconv.Itoa(teamList[i].Linenumber) + " " + teamList[i].Content)
-		t = append(t, GameEngine.Team{FormatHTML.FormatTeamName(teamList[i].Content), teamList[i].Linenumber, teamList[i].Linenumber, 1, nil, 0})
-	}
-
-	return s, t
+	return s, ReadConfig.ReadTeamList(s.list)
 }
 
 func defaultConnection(w http.ResponseWriter, r *http.Request) {
@@ -116,15 +121,127 @@ func controlPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func setupPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "setup", defaultData)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
+	if setupDone{
+		log.Println("Setup Done Redirecting to /")
+		http.Redirect(w, r, "/", http.StatusFound)
+	}else {
+		renderTemplate(w, "setup", defaultData)
+	}
+}
+func cSettings(w http.ResponseWriter, r *http.Request) {
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	if r.Form["ChangeS"] != nil{
+		if r.FormValue("GameMode")!=""{
+			s.gameMode, _ = strconv.Atoi(r.FormValue("GameMode"))
+			log.Println("Change GameModed to: ",s.gameMode)
+		}
+		if r.FormValue("NoF")!=""{
+			s.fields, _ = strconv.Atoi(r.FormValue("NoF"))
+			log.Println("Change Number of Fields to: ",s.fields)
+		}
+		if r.FormValue("NoG")!=""{
+			s.groupCont, _ = strconv.Atoi(r.FormValue("NoG"))
+			log.Println("Change Number of Groups to: ",s.groupCont)
+		}
+	}
+
+	http.Redirect(w, r, "/setup/", http.StatusFound)
+}
+
+func uploadTList(w http.ResponseWriter, r *http.Request) {
+	log.Println("method:", r.Method) //get request method
+	r.ParseMultipartForm(32 << 20)
+	file, handler, err := r.FormFile("FName")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer file.Close()
+	log.Println(w, "%v", handler.Header)
+	f, err := os.OpenFile(handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer f.Close()
+	io.Copy(f, file)
+	s.list=handler.Filename
+	log.Println("Loading Team List: ",s.list)
+	exists:=false
+	for _,v:= range ReadConfig.ReadTeamList(s.list){
+		for _,v2:= range t{
+			if v.Name==v2.Name{
+				exists=true
+			}
+		}
+		if !exists{
+			t=append(t,v)
+			http.HandleFunc("/"+v.Name, teamPage)
+			log.Println("Adding Team: ",v)
+		}else {
+			log.Println("Team ",v," allready exsits, rejected")
+			exists=false
+		}
+	}
+	defaultData.Table = FormatHTML.FormatTeamLIst(t)
+	http.Redirect(w, r, "/setup/", http.StatusFound)
 }
 
 func addTeam(w http.ResponseWriter, r *http.Request) {
 	log.Println("method:", r.Method) //get request method
 	r.ParseForm()
+	if r.Form["Add"] != nil && r.FormValue("Team")!="" {
+		n:=FormatHTML.FormatTeamName(r.FormValue("Team"))
+		t = append(t, GameEngine.Team{n, len(t)+1, len(t)+1, 1, nil, 0})
+		http.HandleFunc("/"+n, teamPage)
+		defaultData.Table = FormatHTML.FormatTeamLIst(t)
+	}
 	log.Println("Add Team: ", r.Form["Team"])
+
 	http.Redirect(w, r, "/setup/", http.StatusFound)
+}
+
+func cTName(w http.ResponseWriter, r *http.Request) {
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	if r.Form["Change"] != nil && r.FormValue("TName")!="" {
+		s.name=r.FormValue("TName")
+		defaultData.Name=template.HTML(s.name)
+	}
+	log.Println("Change Turney Name: ", r.Form["TName"])
+
+	http.Redirect(w, r, "/setup/", http.StatusFound)
+}
+
+func endSetup(w http.ResponseWriter, r *http.Request) {
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	if r.Form["end"] != nil{
+		setupDone = true
+		gg=nil
+		var gq [][]GameEngine.Game
+		if s.gameMode == 0 {
+			t=GameEngine.ChangeTGroup(s.groupCont,t)
+			gpGroups := GameEngine.BuildGroups(s.groupCont, t)
+			for i := 0; i <= s.groupCont; i++ {
+				for u := 0; u <= 6; u++ {
+					gq = append(gq, GameEngine.BuildGroupGames(gpGroups[i]))
+					gpGroups[i] = GameEngine.GroupPlayed(gpGroups[i], gq[u])
+				}
+				gg = append(gg, gq)
+				gq = nil
+			}
+			for i, v := range gg {
+				for i2, v2 := range v {
+					log.Println("Group:", i, " Round ", i2, " ", v2)
+				}
+			}
+		}
+	}
+	log.Println("Setup Done")
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func rank(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +255,7 @@ func rank(w http.ResponseWriter, r *http.Request) {
 		log.Println("Group Changed")
 
 		iP, _ := strconv.Atoi(r.FormValue("Group"))
-		if iP < 6 {
+		if iP < s.groupCont {
 			tdata.I = iP + 1
 		} else {
 			tdata.I = 0
@@ -310,6 +427,11 @@ func teamPage(w http.ResponseWriter, r *http.Request) {
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
+func buildEliminationGames(w http.ResponseWriter, r *http.Request) {
+
+	http.Redirect(w, r, "/setup/", http.StatusFound)
+}
+
 func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 	err := templates.ExecuteTemplate(w, tmpl+".html", t)
 	if err != nil {
@@ -387,10 +509,15 @@ func main() {
 	http.HandleFunc("/setup/", setupPage)
 	http.HandleFunc("/rank", rank)
 	http.HandleFunc("/games", games)
+	http.HandleFunc("/cSettings", cSettings)
 	http.HandleFunc("/addTeam", addTeam)
+	http.HandleFunc("/cTName", cTName)
+	http.HandleFunc("/uploadTList", uploadTList)
+	http.HandleFunc("/endSetup", endSetup)
 	http.HandleFunc("/submitResult", submitResult)
 	http.HandleFunc("/receiveResult", receiveResult)
 	http.HandleFunc("/tournament/", mainPage)
+	http.HandleFunc("/bEGames/", buildEliminationGames)
 	for _, v := range t {
 		http.HandleFunc("/"+v.Name, teamPage)
 	}

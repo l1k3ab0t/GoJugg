@@ -6,9 +6,37 @@
 </head>
 <body>
     <h1>{{.Name}} Setup Page</h1>
+    <h3>Change Settings:</h3>
+    <form action="/cTName" method="post">
+        Tournament Name:<input type="text" value="{{.Name}}" name="TName">
+        <input type="submit"  name="Change" value="Change">
+    </form>
+    <br>
+    <form action="/uploadTList" enctype="multipart/form-data" method="post">
+        Upload TeamList:<input type="file" name="FName" />
+        <input type="hidden" name="token" value="{{.}}"/>
+        <input type="submit" value="upload" />
+    </form><br>
+    <form action="/cSettings"  method="post">
+        GameMode:<select name="GameMode">
+                    <option value="0">Groups</option>
+                    <option value="1">Elimination WIP</option>
+                </select><br>
+        Number of Fields:<input type="number" min="1" value="{{.I}}" name="NoF"><br>
+        Number of Groups:<input type="number" min="1" value="{{.I2}}" name="NoG"><br>
+        Console Logging : <input type="checkbox" checked><br>
+        <input type="submit"  name="ChangeS" value="Change">
+    </form>
+    <h3>Teams in Tournament</h3><br>
+    {{.Table}}<br>
     <form action="/addTeam" method="post">
         Team:<input type="text" name="Team"><br>
-        <input type="submit"  value="Add Team">
+        <input type="submit" name="Add" value="Add Team">
     </form>
+
+    <form action="/endSetup" method="post">
+        <input type="submit" name="end" value="End Setup">
+    </form>
+
 </body>
 </html>

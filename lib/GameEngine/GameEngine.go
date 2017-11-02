@@ -294,3 +294,51 @@ func TeamByName (name string,t []Team) Team{
 	}
 	return team
 }
+
+// Elimination Games --------------------------------------------------------------------------------------------
+
+func ShuffleAdvancingTeams(aTCount int, g [][][]Game, t [][]Team) ([][]Team, bool){
+	var aTeams [][]Team
+	var rank [][]Rank
+	var rs [] Rank
+	preElemination:=false
+	for i,v:=range g{
+		rank = append(rank,SortByRank(v,t[i]))
+	}
+	log.Println(rank)
+	i:=0
+	for _,v:=range rank{
+		rs =nil
+		for i2,v2:= range v{
+			if (i2>0 && v2.Rank==rs[0].Rank)||i2==0 {
+				rs = append(rs, v2)
+			}else if v2.Rank>rs[0].Rank&& len(rs)>aTCount {
+				if len(rs) > aTCount {
+					preElemination = true
+				}
+				for _,v3:=range rs{
+					aTeams[i]=append(aTeams[i],TeamByName(v3.TName,t[i2]))
+				}
+				rs=nil
+				rs=append(rs,v2)
+			}else if v2.Rank>rs[0].Rank&& len(rs)<aTCount {
+
+			}
+
+
+
+			if i >=aTCount{
+				i=0
+			}else {
+				i++
+			}
+
+		}
+	}
+	return aTeams,preElemination
+}
+
+func BuildEliminationGames ([]Team ) []Game{
+
+	return nil
+}
