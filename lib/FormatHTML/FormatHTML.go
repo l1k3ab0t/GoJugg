@@ -85,3 +85,34 @@ func FormatTeamLink(uri string) template.HTML {
 	return template.HTML("<a href=\"/" + uri + "\">" + uri + "</a>")
 }
 
+func FormatGSave(g [][][]GameEngine.Game) string{
+	var str string
+	for _,v:=range g{
+		str=str+"<ggrp>"
+		for _,v2:=range v{
+			str=str+"<round>"
+			for _,v3:=range v2{
+				str=str+"<gfield>"
+				str=str+"<op1>"
+				str=str+strconv.Itoa(v3.Opponent1.ID)
+				str=str+"</op1>"
+				str=str+"<op2>"
+				str=str+strconv.Itoa(v3.Opponent2.ID)
+				str=str+"</op2>"
+				str=str+"<res>"
+				str=str+"<t1j>"
+				str=str+strconv.Itoa(v3.Result.Team1Juggs)
+				str=str+"</t1j>"
+				str=str+"</t2j>"
+				str=str+strconv.Itoa(v3.Result.Team2Juggs)
+				str=str+"</t2j>"
+				str=str+"</res>"
+				str=str+"</gfield>"
+			}
+			str=str+"</round>"
+		}
+		str=str+"</ggrp>"
+	}
+	return str
+}
+

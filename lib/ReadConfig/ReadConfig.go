@@ -2,12 +2,12 @@ package ReadConfig
 
 import (
 	"bufio"
+	"github.com/l1k3ab0t/GoJugg/lib/FormatHTML"
+	"github.com/l1k3ab0t/GoJugg/lib/GameEngine"
 	"log"
 	"os"
-	"strings"
-	"github.com/l1k3ab0t/GoJugg/lib/GameEngine"
 	"strconv"
-	"github.com/l1k3ab0t/GoJugg/lib/FormatHTML"
+	"strings"
 )
 
 type Line struct {
@@ -39,7 +39,7 @@ func SplitConfig(config string) []string {
 
 }
 
-func ReadTeamList(f string) []GameEngine.Team{
+func ReadTeamList(f string) []GameEngine.Team {
 	teamList := ReadFile(f)
 	var t []GameEngine.Team
 	for i := range teamList {

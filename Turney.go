@@ -5,24 +5,30 @@ import (
 	"github.com/l1k3ab0t/GoJugg/lib/GameEngine"
 	"github.com/l1k3ab0t/GoJugg/lib/ReadConfig"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
-	"os"
-	"io"
 )
+
+type save struct {
+	teams    []GameEngine.Team
+	games    [][][]GameEngine.Game
+	settings settings
+}
 
 type settings struct {
 	webcfg     bool
 	name       string
 	list       string
-	fields	int
+	fields     int
 	gameMode   int
 	groupCont  int
 	consoleLog bool
 	port       int
-	aTCount		int
+	aTCount    int
 }
 type data struct {
 	Name        template.HTML
@@ -34,6 +40,7 @@ type data struct {
 	I2          int
 }
 
+var running bool
 var s settings
 var gg [][][]GameEngine.Game
 var t []GameEngine.Team
@@ -107,6 +114,42 @@ func loadCFG() (settings, []GameEngine.Team) {
 	return s, ReadConfig.ReadTeamList(s.list)
 }
 
+func startAutosaving(t time.Duration) {
+	running = true
+	Ticker := time.NewTicker(t)
+	for tik := range Ticker.C {
+		if running {
+			log.Println("Tick at", tik)
+			autosave("save.xml", createSave())
+		} else {
+			break
+		}
+
+	}
+	Ticker.Stop()
+	log.Println("Ticker Stoped")
+}
+
+func stopAutosaving() {
+	running = false
+	log.Println("Stoping Autosaving")
+}
+
+func autosave(filename string, content save) {
+	log.Println("AutoSaving:", filename)
+	f, err := os.OpenFile("saves/"+time.Now().Format(time.RFC3339)+".as", os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer f.Close()
+	f.WriteString(FormatHTML.FormatGSave(gg))
+}
+
+func createSave() save {
+	return save{t, gg, s}
+}
+
 func defaultConnection(w http.ResponseWriter, r *http.Request) {
 	if setupDone {
 		http.Redirect(w, r, "/tournament/", http.StatusFound)
@@ -121,29 +164,30 @@ func controlPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func setupPage(w http.ResponseWriter, r *http.Request) {
+	stopAutosaving()
 	log.Printf("IP: " + r.RemoteAddr + " connected")
-	if setupDone{
+	if setupDone {
 		log.Println("Setup Done Redirecting to /")
 		http.Redirect(w, r, "/", http.StatusFound)
-	}else {
+	} else {
 		renderTemplate(w, "setup", defaultData)
 	}
 }
 func cSettings(w http.ResponseWriter, r *http.Request) {
 	log.Println("method:", r.Method) //get request method
 	r.ParseForm()
-	if r.Form["ChangeS"] != nil{
-		if r.FormValue("GameMode")!=""{
+	if r.Form["ChangeS"] != nil {
+		if r.FormValue("GameMode") != "" {
 			s.gameMode, _ = strconv.Atoi(r.FormValue("GameMode"))
-			log.Println("Change GameModed to: ",s.gameMode)
+			log.Println("Change GameModed to: ", s.gameMode)
 		}
-		if r.FormValue("NoF")!=""{
+		if r.FormValue("NoF") != "" {
 			s.fields, _ = strconv.Atoi(r.FormValue("NoF"))
-			log.Println("Change Number of Fields to: ",s.fields)
+			log.Println("Change Number of Fields to: ", s.fields)
 		}
-		if r.FormValue("NoG")!=""{
+		if r.FormValue("NoG") != "" {
 			s.groupCont, _ = strconv.Atoi(r.FormValue("NoG"))
-			log.Println("Change Number of Groups to: ",s.groupCont)
+			log.Println("Change Number of Groups to: ", s.groupCont)
 		}
 	}
 
@@ -167,22 +211,22 @@ func uploadTList(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	io.Copy(f, file)
-	s.list=handler.Filename
-	log.Println("Loading Team List: ",s.list)
-	exists:=false
-	for _,v:= range ReadConfig.ReadTeamList(s.list){
-		for _,v2:= range t{
-			if v.Name==v2.Name{
-				exists=true
+	s.list = handler.Filename
+	log.Println("Loading Team List: ", s.list)
+	exists := false
+	for _, v := range ReadConfig.ReadTeamList(s.list) {
+		for _, v2 := range t {
+			if v.Name == v2.Name {
+				exists = true
 			}
 		}
-		if !exists{
-			t=append(t,v)
+		if !exists {
+			t = append(t, v)
 			http.HandleFunc("/"+v.Name, teamPage)
-			log.Println("Adding Team: ",v)
-		}else {
-			log.Println("Team ",v," allready exsits, rejected")
-			exists=false
+			log.Println("Adding Team: ", v)
+		} else {
+			log.Println("Team ", v, " allready exsits, rejected")
+			exists = false
 		}
 	}
 	defaultData.Table = FormatHTML.FormatTeamLIst(t)
@@ -192,9 +236,9 @@ func uploadTList(w http.ResponseWriter, r *http.Request) {
 func addTeam(w http.ResponseWriter, r *http.Request) {
 	log.Println("method:", r.Method) //get request method
 	r.ParseForm()
-	if r.Form["Add"] != nil && r.FormValue("Team")!="" {
-		n:=FormatHTML.FormatTeamName(r.FormValue("Team"))
-		t = append(t, GameEngine.Team{n, len(t)+1, len(t)+1, 1, nil, 0})
+	if r.Form["Add"] != nil && r.FormValue("Team") != "" {
+		n := FormatHTML.FormatTeamName(r.FormValue("Team"))
+		t = append(t, GameEngine.Team{n, len(t) + 1, len(t) + 1, 1, nil, 0})
 		http.HandleFunc("/"+n, teamPage)
 		defaultData.Table = FormatHTML.FormatTeamLIst(t)
 	}
@@ -206,9 +250,9 @@ func addTeam(w http.ResponseWriter, r *http.Request) {
 func cTName(w http.ResponseWriter, r *http.Request) {
 	log.Println("method:", r.Method) //get request method
 	r.ParseForm()
-	if r.Form["Change"] != nil && r.FormValue("TName")!="" {
-		s.name=r.FormValue("TName")
-		defaultData.Name=template.HTML(s.name)
+	if r.Form["Change"] != nil && r.FormValue("TName") != "" {
+		s.name = r.FormValue("TName")
+		defaultData.Name = template.HTML(s.name)
 	}
 	log.Println("Change Turney Name: ", r.Form["TName"])
 
@@ -218,12 +262,12 @@ func cTName(w http.ResponseWriter, r *http.Request) {
 func endSetup(w http.ResponseWriter, r *http.Request) {
 	log.Println("method:", r.Method) //get request method
 	r.ParseForm()
-	if r.Form["end"] != nil{
+	if r.Form["end"] != nil {
 		setupDone = true
-		gg=nil
+		gg = nil
 		var gq [][]GameEngine.Game
 		if s.gameMode == 0 {
-			t=GameEngine.ChangeTGroup(s.groupCont,t)
+			t = GameEngine.ChangeTGroup(s.groupCont, t)
 			gpGroups := GameEngine.BuildGroups(s.groupCont, t)
 			for i := 0; i <= s.groupCont; i++ {
 				for u := 0; u <= 6; u++ {
@@ -418,11 +462,11 @@ func mainPage(w http.ResponseWriter, r *http.Request) {
 
 func teamPage(w http.ResponseWriter, r *http.Request) {
 	d := defaultData
-	team:=GameEngine.TeamByName(string(FormatHTML.FormatURI(r.RequestURI)),t)
+	team := GameEngine.TeamByName(string(FormatHTML.FormatURI(r.RequestURI)), t)
 	d.Name = FormatHTML.FormatURI(r.RequestURI)
-	d.I=GameEngine.TeamRank(team.Name,GameEngine.SortByRankInTourney(gg, GameEngine.BuildGroups(s.groupCont, t))).Rank
-	d.I2=GameEngine.TeamRank(team.Name,GameEngine.SortByRank(gg[team.Group],GameEngine.BuildGroups(s.groupCont,t)[team.Group])).Rank
-	d.TextPhrase1=FormatHTML.FormatBracket(GameEngine.TeamGames(team.Name,gg[team.Group]))
+	d.I = GameEngine.TeamRank(team.Name, GameEngine.SortByRankInTourney(gg, GameEngine.BuildGroups(s.groupCont, t))).Rank
+	d.I2 = GameEngine.TeamRank(team.Name, GameEngine.SortByRank(gg[team.Group], GameEngine.BuildGroups(s.groupCont, t)[team.Group])).Rank
+	d.TextPhrase1 = FormatHTML.FormatBracket(GameEngine.TeamGames(team.Name, gg[team.Group]))
 	renderTemplate(w, "team", d)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
@@ -441,10 +485,12 @@ func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 }
 
 func main() {
+	go startAutosaving(time.Second * 4)
+
 	setupDone = false
 	s, t = loadCFG()
-	/*
-	lfName := time.Now().Format(time.RFC3339) + ".log"
+
+	lfName := "log/" + time.Now().Format(time.RFC3339) + ".log"
 	f, err := os.OpenFile(lfName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
@@ -457,12 +503,11 @@ func main() {
 		log.SetOutput(f)
 	}
 	log.Println("This is a test log entry")
-	*/
 
 	setupDone = !s.webcfg
 	var gq [][]GameEngine.Game
 	if s.gameMode == 0 {
-		t=GameEngine.ChangeTGroup(s.groupCont,t)
+		t = GameEngine.ChangeTGroup(s.groupCont, t)
 		gpGroups := GameEngine.BuildGroups(s.groupCont, t)
 		for i := 0; i <= s.groupCont; i++ {
 			for u := 0; u <= 6; u++ {

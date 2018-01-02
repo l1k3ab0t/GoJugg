@@ -1,36 +1,27 @@
-package GameEngine
+package Objects
 
 import (
 	"log"
 )
 
-type Team struct {
-	Name        string
-	Rank        int
-	ID          int
-	Group       int
-	PlayedVS    []int
-	PlayedGames int
-}
+type Tournament struct {
 
-type Game struct {
-	Opponent1 Team
-	Opponent2 Team
-	Result    GameResult
-}
-
-type GameResult struct {
-	Team1Juggs int
-	Team2Juggs int
+	S Settings
+	TeamList [][]Team
+	games    [][][]Game
+	ranked	 []Rank
+	gRanked  [][]Rank
 }
 
 type Rank struct {
 	Rank   int
 	TName  string
-	Result GameResult
+	Result Result
 }
 
-func ChangeTGroup(gCount int, teams []Team) []Team {
+
+
+func changeTGroup(gCount int, teams []Team) []Team {
 	x := 0
 	for i := range teams {
 
@@ -45,7 +36,7 @@ func ChangeTGroup(gCount int, teams []Team) []Team {
 	return teams
 }
 
-func BuildGroups(gCount int, teams []Team) [][]Team {
+func  buildGroups(gCount int, teams []Team) [][]Team {
 	x := 0
 	tg := make([][]Team, gCount+1)
 	for _, t := range teams {
@@ -62,7 +53,7 @@ func BuildGroups(gCount int, teams []Team) [][]Team {
 	return tg
 }
 
-func BuildGroupGames(t []Team) []Game {
+func buildGroupGames(t []Team) []Game {
 	var games []Game
 	var teams []Team
 	teams = append(teams, t...)
@@ -91,11 +82,11 @@ func BuildGroupGames(t []Team) []Game {
 }
 
 func buildGame(op1 Team, op2 Team) Game {
-	return Game{op1, op2, GameResult{0, 0}}
+	return Game{op1, op2, Result{0, 0}}
 }
 
 func playedAgainst(ID int, t Team) bool {
-	for _, v := range t.PlayedVS {
+	for _, v := range t.PlayedVsID {
 		if ID == v {
 			return true
 		}
@@ -131,7 +122,7 @@ func findAndRemove(t Team, teams []Team) []Team {
 	return teams
 }
 
-func GroupPlayed(teams []Team, games []Game) []Team {
+func groupPlayed(teams []Team, games []Game) []Team {
 	for _, v := range games {
 		for i := range teams {
 			if v.Opponent1.ID == teams[i].ID {
@@ -146,53 +137,100 @@ func GroupPlayed(teams []Team, games []Game) []Team {
 }
 
 func played(t Team, opponent Team) Team {
-	t.PlayedVS = append(t.PlayedVS, opponent.ID)
+	t.PlayedVsID = append(t.PlayedVsID, opponent.ID)
 	return t
 }
 
-// Ranking ------------------------------------------------------------------------------------------------------
-
-func SortByRankInTourney(games [][][]Game, teams [][]Team) []Rank {
-	var r []Rank
-	log.Println(len(games))
-	for i, v := range games {
+func  NewTournament() Tournament {
+	var t []Team
+	tour:=Tournament{}
+	tour.S ,t =Settings{}.LoadCFG("config.cfg")
+	var tmpGames [][]Game
+	t = changeTGroup(tour.S.groupCount, t)
+	gpGroups := buildGroups(tour.S.groupCount, t)
+	for i := 0; i <= tour.S.groupCount; i++ {
+		for u := 0; u <= 6; u++ {
+			tmpGames = append(tmpGames, buildGroupGames(gpGroups[i]))
+			gpGroups[i] = groupPlayed(gpGroups[i], tmpGames[u])
+		}
+		tour.games = append(tour.games, tmpGames)
+		tmpGames = nil
+	}
+	for i, v := range tour.games {
 		for i2, v2 := range v {
 			log.Println("Group:", i, " Round ", i2, " ", v2)
 		}
 	}
-	log.Println(len(teams))
-	for _, v := range teams {
+
+	tour.TeamList=gpGroups
+	tour.UpdateGRanked()
+	tour.UpdateRanked()
+	return tour
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (t Tournament) Games () [][][]Game  {
+	return t.games
+}
+
+func (t Tournament) Ranked () []Rank  {
+	return t.ranked
+}
+
+func (t Tournament) GroupRanked (GroupID int) []Rank{
+	if len(t.gRanked)<GroupID{
+		return nil
+	}else {
+		return t.gRanked[GroupID]
+	}
+
+}
+
+func (t *Tournament) UpdateRanked() {
+	var r []Rank
+	log.Println(len(t.games))
+	for i, v := range t.games {
+		for i2, v2 := range v {
+			log.Println("Group:", i, " Round ", i2, " ", v2)
+		}
+	}
+	log.Println(len(t.TeamList))
+	for _, v := range t.TeamList {
 		for _, v2 := range v {
-			r = append(r, Rank{1, v2.Name, getResults(v2, games[v2.Group])})
+			r = append(r, Rank{1, v2.Name, getResults(v2, t.games[v2.Group])})
 		}
 	}
-	rs := sortByPoints(r)
-	log.Println(len(rs))
-	for i, v := range rs {
+	t.ranked = sortByPoints(r)
+	log.Println(len(t.ranked))
+	for i, v := range t.ranked {
 		log.Println("Team:", i, " Stats ", v)
 	}
-	return rs
 }
 
-func SortByRank(games [][]Game, teams []Team) []Rank {
+func (t *Tournament) UpdateGRanked() {
+	for i:=range t.TeamList{
+		t.UpdateSingleGRanked(i)
+	}
+}
+
+func (t *Tournament) UpdateSingleGRanked(Group int ) {
 	var r []Rank
-	log.Println(len(games))
-	for i, v := range games {
+	log.Println(len(t.games))
+	for i, v := range t.games[Group] {
 		for i2, v2 := range v {
 			log.Println("Group:", i, " Round ", i2, " ", v2)
 		}
 	}
-	log.Println(len(teams))
-	for _, v := range teams {
-		r = append(r, Rank{1, v.Name, getResults(v, games)})
+	log.Println(len(t.TeamList[Group]))
+	for _, v := range t.TeamList[Group] {
+		r = append(r, Rank{1,v.Name , getResults(v, t.games[Group])})
 	}
-	rs := sortByPoints(r)
-	log.Println(len(rs))
-	for i, v := range rs {
+	t.gRanked=append(t.gRanked,sortByPoints(r))
+	log.Println(len(t.gRanked[Group]))
+	for i, v := range t.gRanked[Group] {
 		log.Println("Team:", i, " Stats ", v)
-	}
-	return rs
-}
+	}}
 
 func sortByPoints(list []Rank) []Rank {
 	var r []Rank
@@ -236,8 +274,8 @@ func highestByPoints(list []Rank) []Rank {
 	return hRank
 }
 
-func getResults(t Team, games [][]Game) GameResult {
-	var result GameResult
+func getResults(t Team, games [][]Game) Result {
+	var result Result
 	for _, v := range games {
 		for _, v2 := range v {
 			if t.ID == v2.Opponent1.ID {
@@ -263,80 +301,50 @@ func findAndRemoveRanking(teamName string, ranking []Rank) []Rank {
 	return ranking
 }
 
-func TeamRank(team string, rank []Rank) Rank {
+func (t Tournament) TeamRank(team Team) Rank {
 	var r Rank
-	for _, v := range rank {
-		if v.TName == team {
+	for _, v := range t.ranked {
+		if v.TName == team.Name {
 			return v
 		}
 	}
 	return r
 }
 
-func TeamGames(team string, games [][]Game) []Game {
-	var g []Game
-	for _, v := range games {
+func (t Tournament) TeamGRank(team Team) Rank {
+	var r Rank
+	for _, v := range t.gRanked {
 		for _, v2 := range v {
-			if v2.Opponent1.Name == team || v2.Opponent2.Name == team {
-				g = append(g, v2)
+			if v2.TName == team.Name {
+				return v2
+			}
+		}
+	}
+	return r
+}
+
+func (t Tournament) TeamGames(team string, ) []Game {
+	var g []Game
+	for _, v := range t.games {
+		for _, v2 := range v {
+			for _, v3 := range v2 {
+				if v3.Opponent1.Name == team || v3.Opponent2.Name == team {
+					g = append(g, v3)
+				}
 			}
 		}
 	}
 	return g
 }
 
-func TeamByName(name string, t []Team) Team {
+func (t Tournament) TeamByName(name string) Team {
 	var team Team
-	for _, v := range t {
-		if v.Name == name {
-			return v
+	for _, v := range t.TeamList {
+		for _,v2:=range v{
+			if v2.Name == name {
+				return v2
+			}
 		}
 	}
 	return team
-}
-
-// Elimination Games --------------------------------------------------------------------------------------------
-
-func ShuffleAdvancingTeams(aTCount int, g [][][]Game, t [][]Team) ([][]Team, bool) {
-	var aTeams [][]Team
-	var rank [][]Rank
-	var rs []Rank
-	preElemination := false
-	for i, v := range g {
-		rank = append(rank, SortByRank(v, t[i]))
-	}
-	log.Println(rank)
-	i := 0
-	for _, v := range rank {
-		rs = nil
-		for i2, v2 := range v {
-			if (i2 > 0 && v2.Rank == rs[0].Rank) || i2 == 0 {
-				rs = append(rs, v2)
-			} else if v2.Rank > rs[0].Rank && len(rs) > aTCount {
-				if len(rs) > aTCount {
-					preElemination = true
-				}
-				for _, v3 := range rs {
-					aTeams[i] = append(aTeams[i], TeamByName(v3.TName, t[i2]))
-				}
-				rs = nil
-				rs = append(rs, v2)
-			} else if v2.Rank > rs[0].Rank && len(rs) < aTCount {
-
-			}
-
-			if i >= aTCount {
-				i = 0
-			} else {
-				i++
-			}
-
-		}
-	}
-	return aTeams, preElemination
-}
-
-func BuildEliminationGames([]Team) []Game {
-
-	return nil
 }
