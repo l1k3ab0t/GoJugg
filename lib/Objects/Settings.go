@@ -1,12 +1,11 @@
 package Objects
 
 import (
-	"os"
-	"log"
 	"bufio"
-	"strings"
+	"log"
+	"os"
 	"strconv"
-	"github.com/l1k3ab0t/GoJugg/lib/FormatHTML"
+	"strings"
 )
 
 type Settings struct {
@@ -15,15 +14,85 @@ type Settings struct {
 	list       string
 	fields     int
 	gameMode   int
-	groupCount  int
+	groupCount int
+	roundCount int
 	consoleLog bool
 	port       int
 	aTCount    int
+	customFieldNames bool
 }
 
 type line struct {
 	Linenumber int
 	Content    string
+}
+
+func (s Settings) Webcfg() bool {
+	return s.webcfg
+}
+
+func (s Settings) Name() string {
+	return s.name
+}
+
+func (s *Settings) SetName(Name string) {
+	s.name = Name
+}
+
+func (s Settings) List() string {
+	return s.list
+}
+
+func (s Settings) Fields() int {
+	return s.fields
+}
+
+func (s *Settings) SetFields(Fields int) {
+	s.fields = Fields
+}
+
+func (s Settings) GameMode() int {
+	return s.gameMode
+}
+
+func (s *Settings) SetGameMode(GameMode int) {
+	s.gameMode = GameMode
+}
+
+func (s Settings) GroupCount() int {
+	return s.groupCount
+}
+
+func (s *Settings) SetGroupCount(GCount int) {
+	s.groupCount = GCount
+}
+
+func (s Settings) RoundCount() int {
+	return s.roundCount
+}
+
+func (s *Settings) SetRoundCount(RCount int) {
+	s.roundCount = RCount
+}
+
+func (s Settings) ConsoleLog() bool {
+	return s.consoleLog
+}
+
+func (s Settings) Port() int {
+	return s.port
+}
+
+func (s Settings) ATCount() int {
+	return s.aTCount
+}
+
+func (s Settings) CFieldNames() bool {
+	return s.customFieldNames
+}
+
+func (s *Settings) SetCFieldNames(customFieldNames bool) {
+	s.customFieldNames = customFieldNames
 }
 
 func readFile(path string) []line {
@@ -50,12 +119,12 @@ func splitConfig(config string) []string {
 
 }
 
-func readTeamList(f string) []Team {
+func ReadTeamList(f string) []Team {
 	teamList := readFile(f)
 	var t []Team
 	for i := range teamList {
 		log.Println(strconv.Itoa(teamList[i].Linenumber) + " " + teamList[i].Content)
-		t = append(t, Team{FormatHTML.FormatTeamName(teamList[i].Content), teamList[i].Linenumber, teamList[i].Linenumber, 1, nil, 0})
+		t = append(t, Team{formatTeamName(teamList[i].Content), teamList[i].Linenumber, teamList[i].Linenumber, 1, nil, 0})
 	}
 	return t
 }
@@ -94,6 +163,26 @@ func (s Settings) LoadCFG(configPath string) (Settings, []Team) {
 				log.Println("Wrong Value set in GroupCount")
 			}
 		}
+		if splitConfig(v.Content)[0] == "RoundCount" {
+
+			i, err := strconv.Atoi(splitConfig(v.Content)[1])
+			if err == nil {
+				s.roundCount = i - 1
+			} else {
+				log.Println("Wrong Value set in RoundCount")
+			}
+		}
+
+		if splitConfig(v.Content)[0] == "Fields" {
+
+			i, err := strconv.Atoi(splitConfig(v.Content)[1])
+			if err == nil {
+				s.fields = i - 1
+			} else {
+				log.Println("Wrong Value set in Fields")
+			}
+		}
+
 		if splitConfig(v.Content)[0] == "AdvancingFromGroups" {
 			i, err := strconv.Atoi(splitConfig(v.Content)[1])
 			if err != nil {
@@ -119,9 +208,41 @@ func (s Settings) LoadCFG(configPath string) (Settings, []Team) {
 
 		}
 
+		if splitConfig(v.Content)[0] == "CustomFieldNames" {
+			if splitConfig(v.Content)[1] == "TRUE" {
+				s.customFieldNames = true
+			} else {
+				s.customFieldNames = false
+			}
+		}
+
+
 	}
 
 	log.Println(s)
-	return s, readTeamList(s.list)
+	return s, ReadTeamList(s.list)
 }
 
+func formatTeamName(name string) string {
+	var rname string
+	for _, char := range name {
+		if char == 32 { //32 == " "
+			rname = rname + "-"
+		}else if char == 228{
+			rname = rname + "ae"
+		}else if char == 196{
+			rname = rname + "Ae"
+		}else if char == 246{
+			rname = rname + "oe"
+		}else if char == 214{
+			rname = rname + "Oe"
+		}else if char == 252{
+			rname = rname + "ue"
+		}else if char == 220{
+			rname = rname + "Ue"
+		} else {
+			rname = rname + string(char)
+		}
+	}
+	return rname
+}
