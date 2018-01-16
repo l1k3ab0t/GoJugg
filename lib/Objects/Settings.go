@@ -9,17 +9,17 @@ import (
 )
 
 type Settings struct {
-	webcfg     bool
-	name       string
-	list       string
-	fields     int
-	gameMode   int
-	groupCount int
-	roundCount int
-	consoleLog bool
-	port       int
+	webcfg     bool		`xml:"WegCFG"`
+	name       string	`xml:"TName"`
+	list       string	`xml:"TeamListPath"`
+	fields     int		`xml:"NofFields"`
+	gameMode   int		`xml:"GameMode"`
+	groupCount int		`xml:"GroupCount"`
+	roundCount int		`xml:"RoundCount"`
+	consoleLog bool		`xml:"ConsoleLog"`
+	port       int		`xml:"Port"`
 	aTCount    int
-	customFieldNames bool
+	customFieldNames bool	`xml:"CustomTeamNames"`
 }
 
 type line struct {

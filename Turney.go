@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/l1k3ab0t/GoJugg/lib/Saveing"
 )
 
 type save struct {
@@ -184,7 +185,8 @@ func endSetup(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	if r.Form["end"] != nil {
 		setupDone = true
-		t.FinishSetup()//load extra teamlist missing
+		t.FinishSetup()//load extra teamlist
+		Saveing.Createave("test.xml",t)
 	}
 	log.Println("Setup Done")
 	http.Redirect(w, r, "/", http.StatusFound)

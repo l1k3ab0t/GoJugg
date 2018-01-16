@@ -4,13 +4,17 @@ import (
 	"log"
 	"math"
 	"strconv"
+	"encoding/xml"
+	"fmt"
+	"os"
+	"io/ioutil"
 )
 
 type Tournament struct {
-	S        Settings
-	teamList [][]Team
+	S        Settings	`xml:"Settings"`
+	teamList [][]Team	`xml:"TeamList"`
 	SetupTeamList []Team
-	games    [][][]Game
+	games    [][][]Game	`xml:"Games"`
 	ranked   []Rank
 	gRanked  [][]Rank
 }
@@ -167,36 +171,36 @@ func StartSetup() Tournament{
 	return tour
 }
 
-func (t *Tournament) FinishSetup(){
+func (t *Tournament) FinishSetup() {
 
-	var fieldsagroup [][]int				// round group
-	if t.S.fields>=t.S.groupCount{
-		f :=int(math.Floor(float64(t.S.fields+1)/float64(t.S.groupCount+1)))
-		for i:=0; i<= t.S.roundCount;i++{
+	var fieldsagroup [][]int // round group
+	if t.S.fields >= t.S.groupCount {
+		f := int(math.Floor(float64(t.S.fields+1) / float64(t.S.groupCount+1)))
+		for i := 0; i <= t.S.roundCount; i++ {
 			var fields []int
-			fields=nil
-			for u:=0; u<= t.S.groupCount;u++{
-				fields=append(fields,f)
+			fields = nil
+			for u := 0; u <= t.S.groupCount; u++ {
+				fields = append(fields, f)
 			}
-			fieldsagroup=append(fieldsagroup,fields)
+			fieldsagroup = append(fieldsagroup, fields)
 		}
 	}
-	if (t.S.fields+1)%(t.S.groupCount+1)!=0{
-		fieldsagroup=shuffleRemainingFields(fieldsagroup,int(math.Floor(float64(t.S.fields)/float64(t.S.groupCount))-1))
+	if (t.S.fields+1)%(t.S.groupCount+1) != 0 {
+		fieldsagroup = shuffleRemainingFields(fieldsagroup, int(math.Floor(float64(t.S.fields)/float64(t.S.groupCount))-1))
 	}
 	t.SetupTeamList = changeTGroup(t.S.groupCount, t.SetupTeamList)
 	gpGroups := buildGroups(t.S.groupCount, t.SetupTeamList)
 
 	for i := 0; i <= t.S.groupCount; i++ {
-		t.games = append(t.games, buildGroupGames(gpGroups[i],convertFields(fieldsagroup, i) ,t.S.roundCount))
+		t.games = append(t.games, buildGroupGames(gpGroups[i], convertFields(fieldsagroup, i), t.S.roundCount))
 
 	}
-	if t.S.customFieldNames==false {
+	if t.S.customFieldNames == false {
 		for i, v := range fieldsagroup {
 			u := 0
 			for i2, v2 := range v {
 				for i3 := 0; i3 < v2; i3++ {
-					log.Println("Field Nr:",u," Game: ",i2," ",i," ",i3)
+					log.Println("Field Nr:", u, " Game: ", i2, " ", i, " ", i3)
 					t.games[i2][i][i3].Field = strconv.Itoa(u)
 					u++
 				}
@@ -213,6 +217,7 @@ func (t *Tournament) FinishSetup(){
 	t.teamList = gpGroups
 	t.initializeGRanked()
 	t.UpdateRanked()
+
 }
 
 func shuffleRemainingFields(fieldMap [][]int, rFields int) [][]int{
@@ -502,4 +507,18 @@ func (t Tournament) TeamByName(name string) Team {
 		}
 	}
 	return team
+}
+
+func (t Tournament) Save (filename string) {
+	output, err := xml.MarshalIndent(t, "  ", "    ")
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+	}
+	os.Stdout.Write([]byte(xml.Header))
+
+	os.Stdout.Write(output)
+	err = ioutil.WriteFile(filename, output, 0644)
+	if err != nil {
+		panic(err)
+	}
 }
