@@ -6,6 +6,15 @@
 </head>
 <body>
     <h1>{{.Name}} Setup Page</h1>
+
+
+    <h3>Load Save</h3>
+    <br>
+    <form action="/uploadSave" enctype="multipart/form-data" method="post">
+        Upload Save(.xml):<input type="file" name="FName" />
+        <input type="hidden" name="token" value="{{.}}"/>
+        <input type="submit" value="upload" />
+    </form><br>
     <h3>Change Settings:</h3>
     <form action="/cTName" method="post">
         Tournament Name:<input type="text" value="{{.Name}}" name="TName">

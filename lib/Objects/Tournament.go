@@ -5,7 +5,6 @@ import (
 	"math"
 	"strconv"
 	"encoding/xml"
-	"fmt"
 	"os"
 	"io/ioutil"
 )
@@ -291,6 +290,80 @@ func NewTournament() Tournament {
 	return tour
 }
 
+func LoadFile(path string) []byte{
+	file, err := os.Open(path)
+	if err != nil {
+		log.Printf("error: %v", err)
+		panic(err)
+
+	}
+	defer file.Close()
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Printf("error: %v", err)
+		panic(err)
+	}
+	return data
+}
+
+func  LoadTournament(data []byte) Tournament{
+	var t Tournament
+	save := Save{}
+	err := xml.Unmarshal(data, &save)
+	if err != nil {
+		log.Printf("error: %v", err)
+		panic(err)
+	}
+
+	t.S.roundCount=save.S.RoundCount
+	t.S.groupCount=save.S.GroupCount
+	t.S.list=save.S.List
+	t.S.fields=save.S.Fields
+	t.S.gameMode=save.S.GameMode
+	t.S.name=save.S.Name
+	t.S.aTCount=save.S.ATCount
+	t.S.consoleLog=save.S.ConsoleLog
+	t.S.customFieldNames=save.S.Webcfg
+	t.S.port=save.S.Port
+	t.S.webcfg=save.S.Webcfg
+	t.SetupTeamList=save.TeamList
+
+	t.teamList=make([][]Team,t.S.groupCount+1)
+
+	for _,v:=range save.TeamList{
+		t.teamList[v.Group]=append(t.teamList[v.Group],v)
+	}
+
+	for _,v:=range save.Games{
+		x:=[][]Game{}
+		for _,v2:=range v.GroupGames{
+			x=append(x,v2.GroupGames)
+		}
+		t.games=append(t.games,x)
+		x=nil
+	}
+
+	for _,v:=range save.Games{
+		for _,v2:=range v.GroupGames{
+			log.Println(v2.GroupGames)
+		}
+	}
+
+	for _,v:=range t.games{
+		for _,v2:=range v{
+			log.Println(v2)
+		}
+	}
+	t.UpdateRanked()
+	t.initializeGRanked()
+	t.UpdateGRanked()
+
+	log.Println(save.Games)
+	log.Println(t.games)
+	return t
+
+}
+
 //-------------------------------------------------------------------------------------------------
 
 func (t Tournament) TeamList() []Team {
@@ -507,18 +580,4 @@ func (t Tournament) TeamByName(name string) Team {
 		}
 	}
 	return team
-}
-
-func (t Tournament) Save (filename string) {
-	output, err := xml.MarshalIndent(t, "  ", "    ")
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-	}
-	os.Stdout.Write([]byte(xml.Header))
-
-	os.Stdout.Write(output)
-	err = ioutil.WriteFile(filename, output, 0644)
-	if err != nil {
-		panic(err)
-	}
 }

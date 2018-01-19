@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/l1k3ab0t/GoJugg/lib/Saveing"
 )
 
 type save struct {
@@ -35,13 +34,13 @@ var setupDone bool
 var templates = template.Must(template.ParseFiles("resources/control.html", "resources/tournament.html", "resources/games.html", "resources/setup.html", "resources/submitResult.html", "resources/rank.html", "resources/team.html"))
 
 
-func startAutosaving(tme time.Duration) {
+func startAutoSaving(tme time.Duration) {
 	running = true
 	Ticker := time.NewTicker(tme)
 	for tik := range Ticker.C {
 		if running {
 			log.Println("Tick at", tik)
-			autosave("save.xml", save{t})
+			autoSave("save.xml")
 		} else {
 			break
 		}
@@ -49,20 +48,14 @@ func startAutosaving(tme time.Duration) {
 	Ticker.Stop()
 	log.Println("Ticker Stoped")
 }
-func stopAutosaving() {
+func stopAutoSaving() {
 	running = false
 	log.Println("Stoping Autosaving")
 }
 
-func autosave(filename string, content save) {
+func autoSave(filename string) {
 	log.Println("AutoSaving:", filename)
-	f, err := os.OpenFile("saves/"+time.Now().Format(time.RFC3339)+".as", os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer f.Close()
-	f.WriteString(FormatHTML.FormatGSave(t.Games()))
+	Objects.CreateSave(filename,t)
 }
 
 
@@ -80,7 +73,7 @@ func controlPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func setupPage(w http.ResponseWriter, r *http.Request) {
-	stopAutosaving()
+	//stopAutoSaving()
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 	if setupDone {
 		log.Println("Setup Done Redirecting to /")
@@ -154,6 +147,29 @@ func uploadTList(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/setup/", http.StatusFound)
 }
 
+func uploadSave(w http.ResponseWriter, r *http.Request) {
+	log.Println("method:", r.Method) //get request method
+	r.ParseMultipartForm(32 << 20)
+	file, handler, err := r.FormFile("FName")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer file.Close()
+	log.Println(w, "%v", handler.Header)
+	f, err := os.OpenFile(handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer f.Close()
+	io.Copy(f, file)
+	fname:= handler.Filename
+	t=Objects.LoadTournament(Objects.LoadFile(fname))
+	setupDone = true
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
 func addTeam(w http.ResponseWriter, r *http.Request) {
 	log.Println("method:", r.Method) //get request method
 	r.ParseForm()
@@ -186,7 +202,8 @@ func endSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Form["end"] != nil {
 		setupDone = true
 		t.FinishSetup()//load extra teamlist
-		Saveing.Createave("test.xml",t)
+
+		Objects.CreateSave("test.xml",t)
 	}
 	log.Println("Setup Done")
 	http.Redirect(w, r, "/", http.StatusFound)
@@ -383,6 +400,12 @@ func buildEliminationGames(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/setup/", http.StatusFound)
 }
 
+func saveTournament(w http.ResponseWriter, r *http.Request) {
+	log.Println("AutoSaving:", "CustomSave.xml")
+	Objects.CreateSave("CustomSave.xml",t)
+	http.Redirect(w, r, "/setup/", http.StatusFound)
+}
+
 func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 	err := templates.ExecuteTemplate(w, tmpl+".html", t)
 	if err != nil {
@@ -394,7 +417,7 @@ func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 func main() {
 	//t = Objects.NewTournament()
 	t=Objects.StartSetup()
-	go startAutosaving(time.Second * 25)
+	go startAutoSaving(time.Second * 25)
 
 	setupDone = false
 
@@ -450,11 +473,13 @@ func main() {
 	http.HandleFunc("/addTeam", addTeam)
 	http.HandleFunc("/cTName", cTName)
 	http.HandleFunc("/uploadTList", uploadTList)
+	http.HandleFunc("/uploadSave", uploadSave)
 	http.HandleFunc("/endSetup", endSetup)
 	http.HandleFunc("/submitResult", submitResult)
 	http.HandleFunc("/receiveResult", receiveResult)
 	http.HandleFunc("/tournament/", mainPage)
 	http.HandleFunc("/bEGames/", buildEliminationGames)
+	http.HandleFunc("/save/", saveTournament)
 	for _, v := range t.SetupTeamList {
 		http.HandleFunc("/"+v.Name, teamPage)
 	}
