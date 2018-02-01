@@ -5,6 +5,11 @@
     <title>{{.Name}}</title>
 </head>
 <body>
+
+    <form action="/{{.Name}}" method="post">
+        Password: <input type="password" name="pw" required>
+        <input type="submit"  name="Login" value="Login">
+    </form>
     <table>
         <tr><th>Team:</th><td>{{.Name}}</td>  </tr>
         <tr><th>Overall Rank:</th><td><a href="/rank">{{.I}}</a></td></tr>

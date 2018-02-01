@@ -6,21 +6,23 @@
     </head>
     <body>
         <h1>{{.Name}} Bracket</h1>
+        <h2>Group: {{.I}} Round: {{.I2}}</h2>
         {{.Bracket}}
         <form action="/games" method="post">
-            <input hidden="hidden" type="text" value="{{.I}}" name="Page">
+            <input hidden="hidden" type="text" value="{{.I}}" name="Group">
             <input hidden="hidden" type="text" value="{{.I2}}" name="Round">
             <input type="submit"  name="CRound" value="Next Round">
         </form>
         <form action="/games" method="post">
-            <input hidden="hidden" type="text" value="{{.I}}" name="Page">
+            <input hidden="hidden" type="text" value="{{.I}}" name="Group">
             <input hidden="hidden" type="text" value="{{.I2}}" name="Round">
             <input type="submit"  name="CGroup" value="Next Group">
         </form>
         <form action="/games" method="post">
-            Group: <input type="text" value="{{.I}}" name="Page">
+            Group: <input type="text" value="{{.I}}" name="Group">
             Round: <input type="text" value="{{.I2}}" name="Round">
-            <input type="submit"  name="Custom" value="Go to">
+            <input type="submit"  name="Custom" value="Custom">
         </form>
+
     </body>
 </html>
