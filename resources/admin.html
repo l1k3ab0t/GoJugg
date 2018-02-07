@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.Name}} Administration Page</title>
+</head>
+<body>
+{{template "links"}}
+{{.TextPhrase1}}"
+<h3>Save Tournament</h3>
+
+<form action="/save" method="post">
+    <input type="text" name="FileName" value=".xml"/>
+    <input type="submit" name="Save" value="Save" />
+
+</form><br>
+<h3>Edit Results</h3>
+
+{{.Bracket}}
+
+<form action="/admin" method="post">
+    <select name="TName">
+    {{range .Options}}
+        <option value="{{.TextPhrase1}}"  {{if .B}}selected{{end}}>{{.TextPhrase1}}</option>
+    {{end}}
+    </select>
+    <input type="submit" name="Select" value="Select" />
+</form><br>
+
+<h3> Create Custom Game</h3>
+
+<form action="/CCustom" method="post">
+    <select name="TName1">
+    {{range .Options}}
+        <option value="{{.TextPhrase1}}"  {{if .B}}selected{{end}}>{{.TextPhrase1}}</option>
+    {{end}}
+    </select>
+    vs
+    <select name="TName2">
+    {{range .Options}}
+        <option value="{{.TextPhrase1}}"  {{if .B}}selected{{end}}>{{.TextPhrase1}}</option>
+    {{end}}
+    </select>
+    Field:<input type="text" name="FildName" value=""/>
+    <input type="submit" name="CustomGame" value="Custom Game" />
+</form><br>
+
+</body>
+</html>

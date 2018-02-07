@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.Name}} Login Page</title>
+</head>
+<body>
+<h1>{{.Name}} Login Page</h1>
+<form action="/{{.TextPhrase1}}" method="post">
+    Name:
+    <select name="User">
+        {{range .Options}}
+            <option value="{{.TextPhrase1}}"  {{if .B}}selected{{end}}>{{.TextPhrase1}}</option>
+        {{end}}
+    </select>
+    Password: <input type="password" name="Password" required ><br>
+    <input type="submit" name="Login" value="Login">
+</form>
+
+
+</body>
+</html>

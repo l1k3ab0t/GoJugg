@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-type save struct {
-	t Objects.Tournament
-}
-
 type data struct {
 	Name        template.HTML
 	Table       template.HTML
@@ -27,15 +23,23 @@ type data struct {
 	I2          int
 	I3          int
 	I4          int
+	Options     []option
+}
+
+type option struct {
+	TextPhrase1 template.HTML
+	B           bool
+	Value       template.HTML
 }
 
 var t = Objects.Tournament{}
 var running bool
 var defaultData data
 var setupDone bool
-var templates = template.Must(template.ParseFiles("resources/control.html", "resources/tournament.html", "resources/games.html", "resources/setup.html", "resources/submitResult.html", "resources/rank.html", "resources/team.html", "resources/login.html", "resources/error.html"))
+var templates = template.Must(template.ParseGlob("resources/*"))
 var store = sessions.NewCookieStore([]byte("change-me-pls"))
 var sessionName string
+var pwM Objects.PWHandler
 
 func startAutoSaving(tme time.Duration) {
 	running = true
@@ -207,6 +211,12 @@ func endSetup(w http.ResponseWriter, r *http.Request) {
 		t.FinishSetup() //load extra teamlist
 		sessionName = FormatHTML.FormatTeamName(t.S.Name()) + "session"
 		Objects.CreateSave("test.xml", t)
+		var pwL []Objects.Password
+		for _, v := range t.TeamList() {
+			pwL = append(pwL, Objects.Password{v.Name, "1234"})
+		}
+		pwM = Objects.CreateDB("test.db", pwL)
+		log.Println(pwM.Check(Objects.Password{"Rigor-Mortis", "1234"}))
 	}
 	log.Println("Setup Done")
 	http.Redirect(w, r, "/", http.StatusFound)
@@ -252,11 +262,21 @@ func rank(w http.ResponseWriter, r *http.Request) {
 
 func games(w http.ResponseWriter, r *http.Request) {
 	tdata := defaultData
+	var id int
 	log.Println("method:", r.Method) //get request method
 	r.ParseForm()
 	log.Println("Group: ", r.FormValue("Group"))
 	log.Println("Round: ", r.FormValue("Round"))
-
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if session.Values["ID"] != nil {
+		id = session.Values["ID"].(int)
+	} else {
+		id = 24000
+	}
 	if r.Form["CGroup"] != nil {
 		log.Println("Group Changed")
 		tdata.I2 = 0
@@ -267,7 +287,7 @@ func games(w http.ResponseWriter, r *http.Request) {
 		} else {
 			tdata.I = 0
 		}
-		tdata.Bracket = FormatHTML.FormatBracket(t.Games()[tdata.I][tdata.I2])
+		tdata.Bracket = FormatHTML.FormatBracket(t.Games()[tdata.I][tdata.I2], id)
 	} else if r.Form["CRound"] != nil {
 		log.Println("Round Changed")
 		iR, _ := strconv.Atoi(r.FormValue("Round"))
@@ -278,7 +298,7 @@ func games(w http.ResponseWriter, r *http.Request) {
 		}
 		iP, _ := strconv.Atoi(r.FormValue("Group"))
 		tdata.I = iP
-		tdata.Bracket = FormatHTML.FormatBracket(t.Games()[tdata.I][tdata.I2])
+		tdata.Bracket = FormatHTML.FormatBracket(t.Games()[tdata.I][tdata.I2], id)
 	} else if r.Form["Custom"] != nil {
 
 		log.Println("Custom Destination")
@@ -295,18 +315,14 @@ func games(w http.ResponseWriter, r *http.Request) {
 		} else {
 			tdata.I2 = 0
 		}
-		tdata.Bracket = FormatHTML.FormatBracket(t.Games()[tdata.I][tdata.I2])
+		tdata.Bracket = FormatHTML.FormatBracket(t.Games()[tdata.I][tdata.I2], id)
 	} else {
-		session, err := store.Get(r, sessionName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+
 		if session.Values["Group"] != nil {
 			tdata.I = session.Values["Group"].(int)
-			tdata.Bracket = FormatHTML.FormatBracket(t.Games()[session.Values["Group"].(int)][0])
+			tdata.Bracket = FormatHTML.FormatBracket(t.Games()[session.Values["Group"].(int)][0], id)
 		} else {
-			tdata.Bracket = FormatHTML.FormatBracket(t.Games()[0][0])
+			tdata.Bracket = FormatHTML.FormatBracket(t.Games()[0][0], id)
 		}
 	}
 
@@ -338,7 +354,7 @@ func submitResult(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if session.Values["ID"] == iD1 || session.Values["ID"] == iD2 {
+		if session.Values["ID"] == iD1 || session.Values["ID"] == iD2 || session.Values["Admin"] == true {
 			for _, v := range t.Games() {
 				for _, v2 := range v {
 					for _, v3 := range v2 {
@@ -418,7 +434,106 @@ func teamPage(w http.ResponseWriter, r *http.Request) {
 	d := defaultData
 	team := t.TeamByName(string(FormatHTML.FormatURI(r.RequestURI)))
 	d.Name = FormatHTML.FormatURI(r.RequestURI)
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if r.Form["Login"] != nil {
+		if pwM.Check(Objects.Password{team.Name, r.FormValue("pw")}) {
+			session.Options = &sessions.Options{
+				Path:     "/",
+				MaxAge:   86400 * 5,
+				HttpOnly: true,
+			}
+			// Set some session values.
+			session.Values["Admin"] = false
+			session.Values["Round"] = 0
+			session.Values["Group"] = team.Group
+			session.Values["ID"] = team.ID
+			session.Values["loggedIn"] = true
+			session.ID = team.Name
+			// Save it before we write to the response/return from the handler.
+			session.Save(r, w)
+			log.Println(session.ID, " logged in")
+			log.Println(r.RemoteAddr)
+		} else {
+			log.Println("Authentication failed, wrong Password. User: ", team.Name)
+		}
+
+	}
+	d.I = t.TeamRank(team).Rank
+	d.I2 = t.TeamGRank(team).Rank
+	if session.Values["ID"] != nil {
+		d.TextPhrase1 = FormatHTML.FormatBracket(t.TeamGames(team), session.Values["ID"].(int))
+	} else {
+		d.TextPhrase1 = FormatHTML.FormatBracket(t.TeamGames(team), 23000)
+	}
+
+	renderTemplate(w, "team", d)
+	log.Printf("IP: " + r.RemoteAddr + " connected")
+	log.Println(session.Values["ID"])
+}
+
+func buildEliminationGames(w http.ResponseWriter, r *http.Request) {
+
+	http.Redirect(w, r, "/setup/", http.StatusFound)
+}
+
+func saveTournament(w http.ResponseWriter, r *http.Request) {
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	log.Println(" Save File Name: ", r.FormValue("FileName"))
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if session.Values["Admin"] == true && r.Form["Save"] != nil {
+		log.Println("Saving:", r.FormValue("FileName"))
+		Objects.CreateSave(r.FormValue("FileName"), t)
+		http.Redirect(w, r, "/admin", http.StatusFound)
+	} else {
+		errorData := defaultData
+		errorData.TextPhrase1 = template.HTML("No Rights/ No fileName")
+		renderTemplate(w, "error", errorData)
+		log.Printf("IP: " + r.RemoteAddr + " connected")
+	}
+}
+
+func admin(w http.ResponseWriter, r *http.Request) {
+
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	log.Println("User: ", r.FormValue("User"))
+	log.Println("Password: ", r.FormValue("Password")) //Remove Later
+	log.Println(r.Form["User"])
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if session.Values["Admin"] == true {
+		adminData := defaultData
+		if r.Form["Select"] != nil {
+
+			log.Println("Selected Team: ", r.FormValue("TName"))
+			adminData.Bracket = FormatHTML.FormatBracket(t.TeamGames(t.TeamByName(r.FormValue("TName"))), 0)
+
+		} else {
+			adminData.Bracket = FormatHTML.FormatBracket(t.Games()[0][0], 0)
+		}
+		for _, v := range t.TeamList() {
+			if r.FormValue("TName") == v.Name {
+				adminData.Options = append(adminData.Options, option{template.HTML(v.Name), true, template.HTML("")})
+			} else {
+				adminData.Options = append(adminData.Options, option{template.HTML(v.Name), false, template.HTML("")})
+
+			}
+		}
+
+		renderTemplate(w, "admin", adminData)
+	} else if r.Form["Login"] != nil && r.FormValue("User") == "Admin" {
 		session, err := store.Get(r, sessionName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -429,33 +544,72 @@ func teamPage(w http.ResponseWriter, r *http.Request) {
 			MaxAge:   86400 * 5,
 			HttpOnly: true,
 		}
-		// Set some session values.
-		session.Values["Round"] = 0
-		session.Values["Group"] = team.Group
-		session.Values["ID"] = team.ID
+
+		session.Values["ID"] = 0
+		session.Values["Admin"] = true
 		session.Values["loggedIn"] = true
-		session.ID = team.Name
-		// Save it before we write to the response/return from the handler.
+		session.ID = "Admin"
 		session.Save(r, w)
 		log.Println(session.ID, " logged in")
+
 		log.Println(r.RemoteAddr)
+		http.Redirect(w, r, "/admin", http.StatusFound)
+	} else {
+		adminData := defaultData
+		adminData.TextPhrase1 = template.HTML("admin")
+		adminData.Options = append(adminData.Options, option{template.HTML("Admin"), true, template.HTML("")})
+
+		renderTemplate(w, "login", adminData)
 	}
-	d.I = t.TeamRank(team).Rank
-	d.I2 = t.TeamGRank(team).Rank
-	d.TextPhrase1 = FormatHTML.FormatBracket(t.TeamGames(team))
-	renderTemplate(w, "team", d)
 	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
-func buildEliminationGames(w http.ResponseWriter, r *http.Request) {
+func login(w http.ResponseWriter, r *http.Request) {
+	log.Println("method:", r.Method) //get request method
+	r.ParseForm()
+	log.Println("User: ", r.FormValue("User"))
+	log.Println("Password: ", r.FormValue("Password")) //Remove Later
+	log.Println(r.Form["User"])
+	if r.Form["User"] == nil {
+		loginData := defaultData
+		loginData.TextPhrase1 = template.HTML("login")
+		for _, v := range t.TeamList() {
+			loginData.Options = append(loginData.Options, option{template.HTML(v.Name), false, template.HTML("")})
+		}
+		renderTemplate(w, "login", loginData)
+	} else {
+		team := t.TeamByName(r.FormValue("User"))
+		if pwM.Check(Objects.Password{team.Name, r.FormValue("pw")}) {
+			session, err := store.Get(r, sessionName)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			session.Options = &sessions.Options{
+				Path:     "/",
+				MaxAge:   86400 * 5,
+				HttpOnly: true,
+			}
 
-	http.Redirect(w, r, "/setup/", http.StatusFound)
-}
+			// Set some session values.
+			session.Values["Admin"] = false
+			session.Values["Round"] = 0
+			session.Values["Group"] = team.Group
+			session.Values["ID"] = team.ID
+			session.Values["loggedIn"] = true
+			session.ID = team.Name
+			// Save it before we write to the response/return from the handler.
+			session.Save(r, w)
+			log.Println(session.ID, " logged in")
+			log.Println(r.RemoteAddr)
+			http.Redirect(w, r, "/"+r.FormValue("User"), http.StatusFound)
+		} else {
+			log.Println("Authentication failed, wrong Password. User: ", team.Name)
+			http.Redirect(w, r, "/login", http.StatusFound)
+		}
+	}
 
-func saveTournament(w http.ResponseWriter, r *http.Request) {
-	log.Println("AutoSaving:", "CustomSave.xml")
-	Objects.CreateSave("CustomSave.xml", t)
-	http.Redirect(w, r, "/setup/", http.StatusFound)
+	log.Printf("IP: " + r.RemoteAddr + " connected")
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
@@ -465,60 +619,34 @@ func renderTemplate(w http.ResponseWriter, tmpl string, t data) {
 	}
 }
 
-func login(w http.ResponseWriter, r *http.Request) {
-	log.Println("method:", r.Method) //get request method
-	r.ParseForm()
-	log.Println("User: ", r.FormValue("User"))
-	log.Println("Password: ", r.FormValue("Password")) //Remove Later
-	log.Println(r.Form["User"])
-
-	renderTemplate(w, "login", defaultData)
-	log.Printf("IP: " + r.RemoteAddr + " connected")
-}
-
 func main() {
 	//t = Objects.NewTournament()
 	t = Objects.StartSetup()
-	go startAutoSaving(time.Second * 250)
-
-	setupDone = false
-
-	lfName := "log/" + time.Now().Format(time.RFC3339) + ".log"
-	f, err := os.OpenFile(lfName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer f.Close()
-	if t.S.ConsoleLog() {
-		mw := io.MultiWriter(os.Stdout, f)
-		log.SetOutput(mw)
+	if t.S.Webcfg() == false {
+		setupDone = true
+		t.FinishSetup()
+		sessionName = FormatHTML.FormatTeamName(t.S.Name()) + "session"
 	} else {
-		log.SetOutput(f)
+		setupDone = false
 	}
-	log.Println("This is a test log entry")
-
-	setupDone = !t.S.Webcfg()
-
-	//r := GameEngine.SortByRank(gg[0], GameEngine.BuildGroups(s.groupCont, t)[0])
-	//log.Println("Rank: ", r)
+	//go startAutoSaving(time.Second * 250)
 
 	/*
-			gg := GameEngine.BuildGroups(s.groupCont, t)
-			g := GameEngine.BuildGroupGames(gg[3])
-			log.Println("Test  ",gg[3])
-			for _, v := range g {
-				log.Println(v.Opponent1, " vs ", v.Opponent2)
-			}
-			gg[3] = GameEngine.GroupPlayed(gg[3], g)
-			g = GameEngine.BuildGroupGames(gg[3])
-
-			for _, v := range g {
-				log.Println(v.Opponent1, " vs ", v.Opponent2)
-
-			}
-			defaultData.Bracked=FormatHTML.FormatBracket(g)
+		lfName := "log/" + time.Now().Format(time.RFC3339) + ".log"
+		f, err := os.OpenFile(lfName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalf("error opening file: %v", err)
+		}
+		defer f.Close()
+		if t.S.ConsoleLog() {
+			mw := io.MultiWriter(os.Stdout, f)
+			log.SetOutput(mw)
+		} else {
+			log.SetOutput(f)
 		}
 	*/
+	log.Println("This is a test log entry")
+
 	log.Println(time.Now().Format(time.RFC3339))
 	defaultData.Name = template.HTML(t.S.Name())
 	defaultData.Table = FormatHTML.FormatTeamLIst(t.SetupTeamList)
@@ -539,7 +667,8 @@ func main() {
 	http.HandleFunc("/receiveResult", receiveResult)
 	http.HandleFunc("/tournament/", mainPage)
 	http.HandleFunc("/bEGames/", buildEliminationGames)
-	http.HandleFunc("/save/", saveTournament)
+	http.HandleFunc("/save", saveTournament)
+	http.HandleFunc("/admin", admin)
 	http.HandleFunc("/login", login)
 	for _, v := range t.SetupTeamList {
 		http.HandleFunc("/"+v.Name, teamPage)

@@ -1,9 +1,10 @@
 package FormatHTML
 
 import (
-	"html/template"
-	"strconv"
 	"github.com/l1k3ab0t/GoJugg/lib/Objects"
+	"html/template"
+	"log"
+	"strconv"
 )
 
 func FormatTeamLIst(teams []Objects.Team) template.HTML {
@@ -16,13 +17,22 @@ func FormatTeamLIst(teams []Objects.Team) template.HTML {
 	return tmpl
 }
 
-func FormatBracket(games []Objects.Game) template.HTML {
+func FormatBracket(games []Objects.Game, rLv int) template.HTML {
+	log.Println("rlv: ", rLv)
 	tmpl := template.HTML("<table>")
 	tmpl = tmpl + "<tr> <th> Team 1 ID </th> <th> Team 1 </th> <th></th> <th> Team 2 ID </th> <th> Team 2 </th><th>Field </th> <th>Result </th> </tr>"
 	for _, v := range games {
 		tmpl = tmpl + template.HTML("\n		<tr> <td>"+strconv.Itoa(v.Opponent1.ID)+"</td>"+"<td>"+string(FormatTeamLink(v.Opponent1.Name))+"</td> <td>	vs		</td> ")
 		tmpl = tmpl + template.HTML(" <td>"+strconv.Itoa(v.Opponent2.ID)+"</td>"+"<td>"+string(FormatTeamLink(v.Opponent2.Name))+"</td><td>"+v.Field+" </td> <td>"+strconv.Itoa(v.Result.Team1Juggs)+" : "+strconv.Itoa(v.Result.Team2Juggs)+"</td>")
-		tmpl = tmpl + "<td>" + formatSubmitButton(v) + "</td></tr>"
+
+		if rLv == 0 {
+			tmpl = tmpl + "<td>" + formatSubmitButton(v) + "</td></tr>"
+		} else if rLv == v.Opponent1.ID || rLv == v.Opponent2.ID {
+			tmpl = tmpl + "<td>" + formatSubmitButton(v) + "</td></tr>"
+		} else {
+			tmpl = tmpl + "<td> </td></tr>"
+		}
+
 	}
 	tmpl = tmpl + "\n	 </table>"
 	return tmpl
@@ -52,17 +62,17 @@ func FormatTeamName(name string) string {
 	for _, char := range name {
 		if char == 32 { //32 == " "
 			rname = rname + "-"
-		}else if char == 228{
+		} else if char == 228 {
 			rname = rname + "ae"
-		}else if char == 196{
+		} else if char == 196 {
 			rname = rname + "Ae"
-		}else if char == 246{
+		} else if char == 246 {
 			rname = rname + "oe"
-		}else if char == 214{
+		} else if char == 214 {
 			rname = rname + "Oe"
-		}else if char == 252{
+		} else if char == 252 {
 			rname = rname + "ue"
-		}else if char == 220{
+		} else if char == 220 {
 			rname = rname + "Ue"
 		} else {
 			rname = rname + string(char)
@@ -85,34 +95,33 @@ func FormatTeamLink(uri string) template.HTML {
 	return template.HTML("<a href=\"/" + uri + "\">" + uri + "</a>")
 }
 
-func FormatGSave(g [][][]Objects.Game) string{
+func FormatGSave(g [][][]Objects.Game) string {
 	var str string
-	for _,v:=range g{
-		str=str+"<ggrp>"
-		for _,v2:=range v{
-			str=str+"<round>"
-			for _,v3:=range v2{
-				str=str+"<gfield>"
-				str=str+"<op1>"
-				str=str+strconv.Itoa(v3.Opponent1.ID)
-				str=str+"</op1>"
-				str=str+"<op2>"
-				str=str+strconv.Itoa(v3.Opponent2.ID)
-				str=str+"</op2>"
-				str=str+"<res>"
-				str=str+"<t1j>"
-				str=str+strconv.Itoa(v3.Result.Team1Juggs)
-				str=str+"</t1j>"
-				str=str+"</t2j>"
-				str=str+strconv.Itoa(v3.Result.Team2Juggs)
-				str=str+"</t2j>"
-				str=str+"</res>"
-				str=str+"</gfield>"
+	for _, v := range g {
+		str = str + "<ggrp>"
+		for _, v2 := range v {
+			str = str + "<round>"
+			for _, v3 := range v2 {
+				str = str + "<gfield>"
+				str = str + "<op1>"
+				str = str + strconv.Itoa(v3.Opponent1.ID)
+				str = str + "</op1>"
+				str = str + "<op2>"
+				str = str + strconv.Itoa(v3.Opponent2.ID)
+				str = str + "</op2>"
+				str = str + "<res>"
+				str = str + "<t1j>"
+				str = str + strconv.Itoa(v3.Result.Team1Juggs)
+				str = str + "</t1j>"
+				str = str + "</t2j>"
+				str = str + strconv.Itoa(v3.Result.Team2Juggs)
+				str = str + "</t2j>"
+				str = str + "</res>"
+				str = str + "</gfield>"
 			}
-			str=str+"</round>"
+			str = str + "</round>"
 		}
-		str=str+"</ggrp>"
+		str = str + "</ggrp>"
 	}
 	return str
 }
-
